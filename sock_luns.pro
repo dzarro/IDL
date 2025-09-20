@@ -19,7 +19,7 @@
 ;               COUNT = number of associated LUN's.
 ;
 ; History     : 20 October 2015, Zarro (ADNET) - written
-;               18 September 2025, Zarro (Consultant) - fixed bug with searching PORT
+;               18 September 2025, Zarro (Consultant/Retired) - fixed bug with searching PORT
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
