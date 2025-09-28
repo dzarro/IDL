@@ -1,3 +1,21 @@
+;+
+; Project     : VSO
+;
+; Name        : KEY_VALUE
+;
+; Purpose     : Extract the value of a key from a header array (e.g. KEY: VALUE)
+;
+; Category    : utility string
+;
+; Syntax      : IDL> value=key_value(header,key)
+;
+; Inputs      : HEADER = string array of KEY: VALUE pairs
+;               KEY = string key name to determine value
+;               
+; Outputs     : VALUE = string value associated with key 
+;
+; History     : 11-September-2025 Zarro (Consultant/Retired) - written            
+;-
 
 function key_value,header,key
 
