@@ -1,3 +1,23 @@
+;+
+; Project     : VSO
+;
+; Name        : BYTE2ARR
+;
+; Purpose     : Convert a byte array into a string array
+;
+; Category    : utility string
+;
+; Syntax      : IDL> ostring=byte2arr(ibyte)
+;
+; Inputs      : IBYTE = byte array
+;               
+; Outputs     : OSTRING = string array equivalent
+;
+; Keywords    : COUNT = # elements in OSTRING
+;
+; History     : 11-September-2025 Zarro (Consultant/Retired) - written           
+;-
+
 function byte2arr,ibyte,count=count
 
 count=0

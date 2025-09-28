@@ -12,7 +12,7 @@
 ; Inputs      : HEADER = string array of KEY: VALUE pairs
 ;               KEY = string key name to determine value
 ;               
-; Outputs     : VALUE = string value associated with key 
+; Outputs     : VALUE = string value associated with KEY
 ;
 ; History     : 11-September-2025 Zarro (Consultant/Retired) - written            
 ;-
