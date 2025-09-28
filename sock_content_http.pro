@@ -51,7 +51,7 @@ if is_blank(response) then begin
 endif
 
 resp=response
-if n_elements(response) eq 1 then resp=line2arr(response)
+if n_elements(response) eq 1 then resp=str_toarr(response)
 
 ;-- get encoding
 
