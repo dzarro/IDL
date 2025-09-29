@@ -15,7 +15,9 @@
 ;
 ; Keywords    : COUNT = # elements in OSTRING
 ;
-; History     : 11-September-2025 Zarro (Consultant/Retired) - written           
+; History     : 11-September-2025 Zarro (Consultant/Retired) - written      
+;
+; Contact     : dzarro@solar.stanford.edu
 ;-
 
 function buff2arr,ibyte,count=count

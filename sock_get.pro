@@ -132,6 +132,8 @@
 ;               - added /NO_DIR_CHECK
 ;               11-July-2025, Zarro (Consultant/Retired)
 ;               - added check for gzip encoded remote file
+;
+; Contact     : dzarro@solar.stanford.edu
 ;-
 ;-----------------------------------------------------------------  
 function sock_get_callback, status, progress, data  

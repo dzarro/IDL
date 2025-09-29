@@ -37,6 +37,8 @@
 ;                7-May-2021, Zarro (ADNET) - added REF_EXTRA
 ;               20-Feb-2022, Zarro (ADNET) - applied URL_FIX to LOCATION
 ;               11-Jul-2025, Zarro (Retired) - introduced KEY_VALUE for generalized parsing/extraction
+;
+; Contact     : dzarro@solar.stanford.edu
 ;-
 
 pro sock_content_http,response,type=type,size=bsize,date=date,$

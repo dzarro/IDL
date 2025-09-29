@@ -48,6 +48,8 @@
 ;               - improved error propagation via keyword inheritance
 ;                11-July-2025, Zarro (Retired)
 ;               - added check for gzip encoded response output
+;
+; Contact     : dzarro@solar.stanford.edu
 ;-
 
 pro sock_list_new,url,output,_ref_extra=extra,err=err,no_check=no_check,$

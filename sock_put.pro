@@ -18,6 +18,8 @@
 ;
 ; History     : 24-March-2016, Zarro (ADNET) - Written
 ;                8-September-2025, Zarro (Retired) - check HTTP status code for success    
+;
+; Contact     : dzarro@solar.stanford.edu
 ;-
 
 pro sock_put,file,url,err=err,_ref_extra=extra,verbose=verbose

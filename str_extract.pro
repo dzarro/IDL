@@ -17,7 +17,8 @@
 ; Keywords    : COUNT = # of matches
 ;
 ; History     : 11-September-2025 Zarro (Consultant) - written
-;              
+;
+; Contact     : dzarro@solar.stanford.edu     
 ;-
 
 function str_extract,input,regex,count=count,_extra=extra
