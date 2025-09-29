@@ -31,6 +31,8 @@
 ;               - improved error checking
 ;               22-Aug-2025, Zarro (Retired)
 ;               - Improved error handling
+;
+; Contact     : dzarro@solar.stanford.edu
 ;-
 
 function sock_post,url,content,err=err,file=file,_ref_extra=extra,debug=debug,old_version=old_version
