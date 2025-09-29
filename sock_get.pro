@@ -130,7 +130,7 @@
 ;               - added /TEMP_DIR
 ;               11-May-2022, Zarro (ADNET)
 ;               - added /NO_DIR_CHECK
-;               11-July-2025, Zarro (Retired)
+;               11-July-2025, Zarro (Consultant/Retired)
 ;               - added check for gzip encoded remote file
 ;-
 ;-----------------------------------------------------------------  
@@ -286,6 +286,7 @@ if valid_time(rdate) && have_file then begin
  dprint,'% Remote file time: ',anytim2utc(fremote_time,/vms)
  dprint,'% Local file time: ',anytim2utc(flocal_time,/vms)
  newer_file=fremote_time gt flocal_time
+ older_file=fremote_time lt flocal_time
 endif
 
 size_change=1b
@@ -293,7 +294,7 @@ if (bsize gt 0) && (osize gt 0) then size_change=(bsize ne osize)
 download=~have_file || clobber || size_change || newer_file || is_string(query)
 
 if ~download then begin
- if ~newer_file then rmess='Newer local file ' else rmess='Local file '
+ if older_file then rmess='Newer local file ' else rmess='Local file '
  mprint,rmess+ofile+' already exists (not downloaded). Use /clobber to re-download.'
  local_file=ofile
  status=2

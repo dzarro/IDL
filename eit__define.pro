@@ -28,6 +28,8 @@
 ;                 even when data was already prepped
 ;               25-July-2015, Zarro (ADNET)
 ;                - removed unnecessary use of Z-buffer
+;               28-September-2025, Zarro (Consultant/Retired) 
+;                - fixed bug with re-reading calibration files
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -60,21 +62,22 @@ return & end
 ;-------------------------------------------------------------------------
 ;-- check for EIT calibration data files
 
-function eit::have_cal,err=err,verbose=verbose,no_download=no_download
+function eit::have_cal,err=err,verbose=verbose,file=file
 
-common have_cal,last_check
+common eit_have_cal,last_check,last_file
+
 err=''
-if exist(last_check) then if last_check then return,last_check
+if is_string(file) && is_string(last_file) then begin
+ if (file eq last_file) && exist(last_check) then return,last_check
+endif
 
-download=~keyword_set(no_download)
 verbose=keyword_set(verbose)
-
 cal_dir=local_name('$SSWDB/soho/eit/calibrate')
 test_file='cal19951209.fts'
 chk=file_search(concat_dir(cal_dir,test_file),count=count)
 have_cal=count eq 1
 
-if ~have_cal and download then begin
+if ~have_cal then begin
  err='SOHO/EIT calibration files not installed.'
  if verbose then message,err,/info
  if self->have_path() then begin
@@ -89,6 +92,7 @@ if ~have_cal and download then begin
  endif
 endif
 
+if is_string(file) then last_file=file else last_file=''
 last_check=have_cal
 return,have_cal
 
@@ -354,14 +358,14 @@ if is_blank(ofile) then return
 
 self->empty
 have_path=self->have_path(err=err1,_extra=extra)
-have_cal=self->have_cal(err=err2,_extra=extra)
+
 nfiles=n_elements(ofile)
 j=0
 sel_img=(is_number(image_no))[0]
 for i=0,nfiles-1 do begin
  valid=self->is_valid(ofile[i],level=level,_extra=extra)
  if ~valid then continue
-
+ 
  if (level eq 1) then begin
   self->fits::read,ofile[i],_extra=extra,/append
   j=self->get(/count)
@@ -370,6 +374,7 @@ for i=0,nfiles-1 do begin
 
 ;-- prep level 0 
 
+ have_cal=self->have_cal(err=err2,file=ofile[i],_extra=extra)
  if have_path then read_eit,ofile[i],eindex,/nodata else $
   self->fits::read,ofile[i],_extra=extra,index=eindex,/nodata
  
@@ -386,7 +391,7 @@ for i=0,nfiles-1 do begin
   if skip then message,'Skipping prep for partial FOV or engineering image.',/info
   delvarx,data
   if (image_no[k] gt -1) and (image_no[k] lt nsub) then begin
-   if have_path then begin
+   if have_path && have_cal then begin
     if skip then begin
      read_eit,ofile[i],index,data,header=header
      if nsub gt 1 then begin
@@ -400,7 +405,7 @@ for i=0,nfiles-1 do begin
     index=self->partial(index,_extra=extra)
    endif else begin
     if ~have_path then xack,err1,/suppress,_extra=extra
-    if ~self->have_cal() then xack,err2,/suppress,_extra=extra
+    if ~have_cal then xack,err2,/suppress,_extra=extra
     message,'Skipping prep.',/info
     self->readfits,ofile[i],data,index=index,_extra=extra
     if nsub gt 1 then begin
@@ -514,8 +519,9 @@ if count gt 0 then level=0 else level=1
 if level eq 0 then begin
  chk=where(stregex(header,'Degridded',/bool,/fold),count)
  if count gt 0 then level=1
- if verbose and (level eq 1) then message,'EIT image is already prepped.',/info
 endif
+
+if verbose and (level eq 1) then mprint,'EIT image is already prepped.'
 
 ;-- check if full-res and full-disk
 
