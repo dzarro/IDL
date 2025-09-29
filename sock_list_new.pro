@@ -133,7 +133,7 @@ endif
 ;-- convert bytes to string
 
 if is_string(encoding) then if encoding eq 'gzip' then output=zlib_uncompress(output,/gzip) 
-output=byte2arr(output)
+output=buff2arr(output)
 if (n_params() eq 1) then if is_string(output) then print,output
 fifo->set,url,output
 
