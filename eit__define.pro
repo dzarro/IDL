@@ -62,14 +62,13 @@ return & end
 ;-------------------------------------------------------------------------
 ;-- check for EIT calibration data files
 
-function eit::have_cal,err=err,verbose=verbose,file=file
+function eit::have_cal,err=err,verbose=verbose
 
-common eit_have_cal,last_check,last_file
+common eit_have_cal,last_check
 
 err=''
-if is_string(file) && is_string(last_file) then begin
- if (file eq last_file) && exist(last_check) then return,last_check
-endif
+
+if exist(last_check) then return,last_check
 
 verbose=keyword_set(verbose)
 cal_dir=local_name('$SSWDB/soho/eit/calibrate')
@@ -92,7 +91,6 @@ if ~have_cal then begin
  endif
 endif
 
-if is_string(file) then last_file=file else last_file=''
 last_check=have_cal
 return,have_cal
 
@@ -358,6 +356,7 @@ if is_blank(ofile) then return
 
 self->empty
 have_path=self->have_path(err=err1,_extra=extra)
+have_cal=self->have_cal(err=err2,_extra=extra)
 
 nfiles=n_elements(ofile)
 j=0
@@ -374,7 +373,7 @@ for i=0,nfiles-1 do begin
 
 ;-- prep level 0 
 
- have_cal=self->have_cal(err=err2,file=ofile[i],_extra=extra)
+ 
  if have_path then read_eit,ofile[i],eindex,/nodata else $
   self->fits::read,ofile[i],_extra=extra,index=eindex,/nodata
  
