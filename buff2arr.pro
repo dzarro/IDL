@@ -1,9 +1,9 @@
 ;+
 ; Project     : VSO
 ;
-; Name        : BYTE2ARR
+; Name        : BUFF2ARR
 ;
-; Purpose     : Convert a byte array into a string array
+; Purpose     : Convert a buffer byte array into a string array
 ;
 ; Category    : utility string
 ;
@@ -18,7 +18,7 @@
 ; History     : 11-September-2025 Zarro (Consultant/Retired) - written           
 ;-
 
-function byte2arr,ibyte,count=count
+function buff2arr,ibyte,count=count
 
 count=0
 if ~is_byte(ibyte) then return,''
