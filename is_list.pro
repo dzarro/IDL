@@ -14,10 +14,8 @@
 ; Outputs     : OUTPUT = 1/0
 ;
 ; History     : 11-August-2017 Zarro (ADNET) - written
-;                8-October-2019, Zarro (ADNET) 
-;                 -added check for vector input
-;               11-November-2020, Zarro (ADNET)
-;                 - switched to checking OBJ_CLASS
+;               11-November-2020, Zarro (ADNET) - switched to checking OBJ_CLASS
+;               4-October-2025, Zarro (Consultant/Retired) - added check for vector input      
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -25,6 +23,13 @@
 function is_list,input
 
 if ~is_object(input) then return,0b
+
+catch, error
+if (error ne 0) then begin
+ catch,/cancel
+ message,/reset
+ return,strupcase(obj_class(input[0])) eq 'LIST'
+endif
 
 return,strupcase(obj_class(input)) eq 'LIST'
 
