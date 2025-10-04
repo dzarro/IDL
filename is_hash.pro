@@ -15,21 +15,19 @@
 ;
 ; Keywords    : ORDERED = 1 ordered HASH
 ;
-; History     : 11-August-2017 Zarro (ADNET) - written
-;                8-October-2019, Zarro (ADNET)
-;                 -added check for vector input
-;                22-November-2020, Zarro (ADNET)
-;                2-September-2025, Zarro (Retired)
+; History     : 11-August-2017 Zarro (ADNET)   - written
+;                8-October-2019, Zarro (ADNET) - added check for vector input           
+;                2-September-2025, Zarro (Consultant/Retired) - added ORDERED keyword
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-function is_hash,input
+function is_hash,input,ordered=ordered
 
 ordered=0b
 if ~is_object(input) then return,0b
 
-chk=strupcase(obj_class(input)) 
+chk=strupcase(obj_class(input[0])) 
 ordered=chk eq 'ORDEREDHASH'
 
 return, ((chk eq 'HASH') || ordered)
