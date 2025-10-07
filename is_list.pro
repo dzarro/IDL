@@ -24,6 +24,7 @@ function is_list,input
 
 if ~is_object(input) then return,0b
 
+error=0
 catch, error
 if (error ne 0) then begin
  catch,/cancel

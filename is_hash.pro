@@ -27,7 +27,18 @@ function is_hash,input,ordered=ordered
 ordered=0b
 if ~is_object(input) then return,0b
 
-chk=strupcase(obj_class(input[0])) 
+error=0
+catch, error
+if (error ne 0) then begin
+ catch,/cancel
+ message,/reset
+ chk=strupcase(obj_class(input[0]))
+ ordered=chk eq 'ORDEREDHASH'
+ return,((chk eq 'HASH') || ordered)
+endif
+
+
+chk=strupcase(obj_class(input)) 
 ordered=chk eq 'ORDEREDHASH'
 
 return, ((chk eq 'HASH') || ordered)
