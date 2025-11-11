@@ -513,12 +513,12 @@ if ~isa(no_deletes_sav,/bool) then no_deletes_sav=boolean(0)
 ;-- get current source snapshot
 
 self->snap_url,source,snap_source,err=err,_extra=extra,count=scount,/cache
-if is_string(err) then return
+if is_string(err) || (scount eq 0) then return
 
 ;-- get current target snapshot
 
 self->snap_dir,target,snap_target,err=err,_extra=extra,count=tcount,/cache
-if is_string(err) then return
+if is_string(err) || (tcount eq 0) then return
 
 ;-- compare snapshots
 
@@ -561,6 +561,7 @@ endif
 
 ncount=self->ncount()
 ocount=self->ocount()
+
 tfiles=[temporary(dsfiles),temporary(dtfiles)]
 dfiles=rem_blanks(get_uniq(tfiles),count=dcount)
 
@@ -592,8 +593,8 @@ if keyword_set(cache) then begin
  dir_cache=self.dir_cache
  have_dirs=dir_cache->haskey(dir)
  if have_dirs then begin
-  dirs=dir_cache[dir]
-  count=dir_cache['count']
+  dirs=(dir_cache[dir])(0)
+  count=(dir_cache['count'])(1)
   ;mprint,'Restoring from DIR_CACHE - '+dir
   return
  endif  
@@ -616,9 +617,7 @@ endif
 
 if count eq 1 then dirs=dirs[0]
 ;mprint,'Saving to DIR_CACHE - '+dir
-dir_cache=self.dir_cache
-dir_cache[dir]=dirs
-dir_cache['count']=count
+self.dir_cache[dir]=list(dirs,count)
 
 return & end
 
@@ -641,12 +640,12 @@ return,ok
 end
 
 ;-------------------------------------------------------------
-;-- list files in directory (excluding snapshots)
+;-- list files in directory
 
 pro mirror::list_files,dir,files,count=count,cache=cache,_ref_extra=extra
 count=0L 
 files=''
-mprint,'called by '+get_caller()
+;mprint,'called by '+get_caller()
 if ~self->is_dir(dir,_extra=extra) then return
 
 have_files=0b
@@ -654,73 +653,67 @@ if keyword_set(cache) then begin
  file_cache=self.file_cache
  have_files=file_cache->haskey(dir)
  if have_files then begin
-  files=file_cache[dir]
-  count=file_cache['count']
- ; mprint,'Restoring from FILE_CACHE - '+dir
+  files=(file_cache[dir])(0)
+  count=(file_cache[dir])(1)
+  ;mprint,'Restoring from FILE_CACHE - '+dir
   return
  endif
 endif
 
 if ~have_files then begin
  path=concat_dir(dir,'*')
- files=file_search(path,count=count,/test_reg,/match_initial_dot,/nosort) 
- if count gt 0 then begin
-  snap_file=self->snap_file()
-  chk=where(snap_file ne files,count)
-  if count gt 0 then begin
-   if count lt n_elements(files) then files=files[chk]
-  endif else files=''
- endif
+ files=file_search(path,count=count,/fully_qualify,/test_reg,/expand_environment,/match_initial_dot,/nosort) 
+ ;sfiles=file_search(path,count=scount,/fully_qualify,/test_sym,/expand_environment,/match_initial_dot,/nosort)
+ ;dfiles=file_search(path,count=dcount,/fully_qualify,/test_dang,/expand_environment,/match_initial_dot,/nosort)
+ ;files=get_uniq([rfiles,sfiles,dfiles])0
 endif
 
 if count eq 1 then files=files[0]
 ;mprint,'Saving to FILE_CACHE - '+dir
-file_cache=self.file_cache
-file_cache[dir]=files
-file_cache['count']=count
+self.file_cache[dir]=list(files,count)
 
 return & end
 
 ;-------------------------------------------------------------
 ;-- get snapshot of URL
 
-pro mirror::snap_url,url,listing,_ref_extra=extra,err=err
+pro mirror::snap_url,url,listing,_ref_extra=extra,err=err,count=count
 
-err=''
-listing=''
-slist=self->slist()
-if is_string(slist) then begin
- if slist[0] eq 'No data' then begin
-  err='No data'
-  return
- endif
- listing=slist
+err='' & count=0
+
+listing=self->slist()
+if listing[0] eq 'No data' then begin
+ err='No remote/source snapshot files'
+ listing=''
  return
 endif
+
+err='' & count=n_elements(listing)
 
 return & end
 
 ;-----------------------------------------------------------
 ;-- get snapshot of directory
 
-pro mirror::snap_dir,dir,listing,_ref_extra=extra,err=err
+pro mirror::snap_dir,dir,listing,_ref_extra=extra,err=err,count=count
 
+count=0 & listing='' & err='No local/target snapshot files'
+self->list_files,dir,files,count=count,_extra=extra
+if count eq 0 then return
+
+;-- remove snap file from listing
+
+;ocount=count
+;snap_file=self->snap_file()
+;chk=where(files ne snap_file,count)
+;if count eq 0 then return
+;if count lt ocount then files=files[chk]
+ 
 err=''
-listing=snap_dir(dir,_extra=extra,exclude=self->snap_file())
-return
-
-ndir=local_name(dir)
-if is_windows() then begin
- spawn,'dir '+ndir,listing,err_result,/hide
- err=strjoin(err_result,', ')
-endif else begin
- ;cmd=['ls','-al',ndir]
- ;spawn,cmd,listing,err_result,/noshell,_extra=extra
- ;cmd="ls -alH "+ndir+" | awk '{print $5, $6, $7, $8, $9}'"
- ;espawn,cmd,listing,err=err_result,/noshell,_extra=extra
-endelse
-
-listing=strcompress(listing)
+info=file_info(files)
+sizes=info.size
+times=info.mtime
+listing=strcompress(files+'|'+string(times)+'|'+string(sizes),/remove_all)
 
 return & end
 
@@ -1040,14 +1033,13 @@ if is_string(self.local_ignore) then begin
  tcount=self->tcount()
  if (tcount gt 0) then begin
   ttemp=self->target()
-  tignore=str_local(self.local_ignore)
   if direct then tnames=ttemp else tnames=self->basename(self.target,ttemp)
-  out=str_remove(tnames,tignore,_extra=extra,rcount=rcount,rindex=rindex,/regex,$
+  out=str_remove(tnames,self.local_ignore,_extra=extra,rcount=rcount,rindex=rindex,/regex,$
                  count=count,index=index)
   if direct then item='directories' else item='files'
   if rcount gt 0 then begin
-   self->log,'Following '+item+' will be ignored: ',_extra=extra
-   self->log,ttemp[rindex],_extra=extra
+   self->log,'Following '+item+' will be ignored: ',_extra=extra,1
+   self->log,ttemp[rindex],_extra=extra,1
   endif
 
   if count gt 0 then begin
@@ -1846,6 +1838,9 @@ endif
 
  get_patt=self->parse(pdata,'get_patt')
  local_ignore=self->parse(pdata,'local_ignore')
+ sname=str_escape(self->snap_name())+'$'
+ if is_string(local_ignore) then local_ignore=local_ignore+'|'+sname else local_ignore=sname 
+ 
  update_log=self->parse(pdata,'update_log')
  self->set,source=source,target=target,err=err
  if is_string(err) then begin

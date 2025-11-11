@@ -24,7 +24,7 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-pro ssw_mirror,target,err=err,_ref_extra=extra,restore=restore
+pro ssw_mirror,target,err=err,_ref_extra=extra,restore_mods=restore_mods
 
 common ssw_mirror,latest_version,sav_m
 
