@@ -24,7 +24,7 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-pro ssw_mirror,target,err=err,_ref_extra=extra,no_restore=no_restore
+pro ssw_mirror,target,err=err,_ref_extra=extra,restore=restore
 
 common ssw_mirror,latest_version,sav_m
 
@@ -42,7 +42,7 @@ if is_blank(target) then begin
  return
 endif
 
-if ~exist(latest_version) && have_proc('restore_mods') && ~keyword_set(no_restore) then begin
+if ~exist(latest_version) && have_proc('restore_mods') && keyword_set(restore) then begin
  restore_mods
  latest_version=1
 endif

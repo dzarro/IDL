@@ -543,15 +543,16 @@ if ~same_target then begin
  dtarget=str_difference(snap_target,snap_target_sav,count=dtcount)
  tignore=str_local(self.local_ignore)
  if dtcount gt 0 then begin  
-  tlist=strsplit(dtarget,' ',/extract)  
+  tlist=strsplit(dtarget,'|',/extract)  
   for i=0,dtcount-1 do begin    
    if dtcount eq 1 then tarr=tlist else tarr=tlist[i]
    tsize=n_elements(tarr)
-   tname=tarr[tsize-1]
-   if tname eq '' then continue
-   if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
-   tfile=concat_dir(target,tname)
+   tfile=tarr[0]
+   if tfile eq '' then continue
+   tname=file_basename(tfile)
    if tname eq self->snap_name() then continue
+   if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
+   ;tfile=concat_dir(target,tname)
    if ~file_test(tfile,/reg) then continue
    if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
   endfor 
@@ -563,6 +564,7 @@ ocount=self->ocount()
 tfiles=[temporary(dsfiles),temporary(dtfiles)]
 dfiles=rem_blanks(get_uniq(tfiles),count=dcount)
 
+
 if (dcount gt 0) && (ncount gt 0) then dfiles=str_remove(dfiles,file_basename(self->new()),count=dcount)
 if (dcount gt 0) && (ocount gt 0) then dfiles=str_remove(dfiles,file_basename(self->old()),count=dcount)
 
@@ -570,7 +572,7 @@ if dcount gt 0 then begin
  if dcount eq 1 then dfiles=dfiles[0]
  diff=source+'/'+dfiles
  self->log,'Source and target have different snapshots.',_extra=extra
-endif
+endif else self->log,'Source and target have identical snapshots.',_extra=extra
 
 status=1b
 return
@@ -644,7 +646,7 @@ end
 pro mirror::list_files,dir,files,count=count,cache=cache,_ref_extra=extra
 count=0L 
 files=''
-
+mprint,'called by '+get_caller()
 if ~self->is_dir(dir,_extra=extra) then return
 
 have_files=0b
@@ -704,15 +706,20 @@ return & end
 pro mirror::snap_dir,dir,listing,_ref_extra=extra,err=err
 
 err=''
+listing=snap_dir(dir,_extra=extra,exclude=self->snap_file())
+return
+
 ndir=local_name(dir)
 if is_windows() then begin
  spawn,'dir '+ndir,listing,err_result,/hide
+ err=strjoin(err_result,', ')
 endif else begin
- cmd=['ls','-al',ndir]
- spawn,cmd,listing,err_result,/noshell,_extra=extra
+ ;cmd=['ls','-al',ndir]
+ ;spawn,cmd,listing,err_result,/noshell,_extra=extra
+ ;cmd="ls -alH "+ndir+" | awk '{print $5, $6, $7, $8, $9}'"
+ ;espawn,cmd,listing,err=err_result,/noshell,_extra=extra
 endelse
 
-err=strjoin(err_result,', ')
 listing=strcompress(listing)
 
 return & end
@@ -1342,8 +1349,10 @@ if ~self.do_directory then begin
     tsame=0b
     if ssame then begin
      tdiff=abs((ttime-stime))
-     tsame=((tdiff mod 3600.) eq 0.) && (tdiff lt 12.*3600.)
-	 ;tsame=(tdiff eq 0.)
+     if tdiff ne 0 then begin
+      tsame=((tdiff mod 3600.) eq 0.) && (tdiff le 12.*3600.)
+      if tsame then mprint,'Corrected for '+strtrim(tiff)+' hour offset'
+     endif else tsame=1b
     endif
     if ~ssame || ~tsame then begin
       ; tdiff=trim2((ttime-stime)/3600.)
@@ -1507,7 +1516,7 @@ for i=0,count-1 do begin
 
  if self->is_url(sfile) then begin
   rfile=self->encode(sfile)
-  sock_get,rfile,out=odir,local=local,/clobber,/no_check,/quiet,err=err,_extra=extra,/no_dir_check
+  sock_get,rfile,out=odir,local=local,/no_check,/clobber,/quiet,err=err,_extra=extra,/no_dir_check
   if is_blank(err) then begin
    alocal=ascii_decode(local)
    if alocal ne local then file_rename,local,alocal,err=err,_extra=extra
