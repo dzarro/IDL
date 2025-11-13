@@ -32,8 +32,8 @@
 ;               NO_DIR_CHECK = set to skip checking if OUT_DIR exist
 ;               and is writeable.
 ;
-; History     : 27-Dec-2009, Zarro (ADNET) - Written
-;                8-Oct-2010, Zarro (ADNET) - Dropped support for
+; History     : 27-Dec-2009, Zarro (ADNET) - written
+;                8-Oct-2010, Zarro (ADNET) - dropped support for
 ;                COPY_FILE. Use LOCAL_FILE.
 ;               28-Sep-2011, Zarro (ADNET) - ensured that URL_SCHEME
 ;               property is set to that of input URL   
