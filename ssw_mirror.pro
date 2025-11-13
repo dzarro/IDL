@@ -19,14 +19,15 @@
 ;               LOG = summary log
 ;               VERBOSE = set to print log 
 ;
-; History     : 13 February 2020 Zarro (ADNET)
+; History     : 13 February 2020 Zarro (ADNET) - written
+;               13 November 2025 Zarro (Consultant/Retired) - fixed bug with restoring from common
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-pro ssw_mirror,target,err=err,_ref_extra=extra,restore_mods=restore_mods
+pro ssw_mirror,target,err=err,_ref_extra=extra,restore_mods=restore_mods,run=run
 
-common ssw_mirror,latest_version,sav_m
+common ssw_mirror,latest_version,sav_m,sav_target
 
 err=''
 ssw=chklog('SSW')
@@ -41,14 +42,22 @@ if is_blank(target) then begin
  mprint,err
  return
 endif
+otarget=target
 
 if ~exist(latest_version) && have_proc('restore_mods') && keyword_set(restore) then begin
  restore_mods
- latest_version=1
 endif
 
-if obj_valid(sav_m) then m=sav_m else m=obj_new('mirror')
+if keyword_set(run) then begin
+ if obj_valid(sav_m) && is_string(sav_target) then begin
+  if sav_target eq target then m=sav_m else mprint,'Ignoring last scan as target changed from before /run.'
+ endif 
+endif else begin
+ if obj_valid(sav_m) then obj_destroy,sav_m
+endelse
 
+if ~obj_valid(m) then m=obj_new('mirror')
+ 
 if strpos(target,'$SSW') gt -1 then begin
  temp=str_rep(target,'$SSW','')
  temp=str_rep(temp,'\','/')
@@ -57,14 +66,17 @@ if strpos(target,'$SSW') gt -1 then begin
   mprint,err
   return
  endif
+
  source=ssw_server()+'/solarsoft'
  source=source+temp
- 
  m->set,source=source,target=target
- m->mirror,_extra=extra,err=err,/recurse
-endif else m->mirror,target,_extra=extra,err=err
+ m->mirror,_extra=extra,err=err,/recurse,run=run
+endif else m->mirror,target,_extra=extra,err=err,run=run
 
-sav_m=m
+if keyword_set(run) then obj_destroy,sav_m else begin
+ sav_m=obj_clone(m) & sav_target=otarget
+endelse
 
- 
+obj_destroy,m
+
 return & end

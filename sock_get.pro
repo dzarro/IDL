@@ -296,8 +296,8 @@ if (bsize gt 0) && (osize gt 0) then size_change=(bsize ne osize)
 download=~have_file || clobber || size_change || newer_file || is_string(query)
 
 if ~download then begin
- if older_file then rmess='Newer local file ' else rmess='Local file '
- mprint,rmess+ofile+' already exists (not downloaded). Use /clobber to re-download.'
+ if older_file then rmess='Newer local file ' else rmess='Identical local file '
+ mprint,rmess+ofile+' exists (not downloaded). Use /clobber to re-download.'
  local_file=ofile
  status=2
  return
@@ -392,6 +392,7 @@ if is_string(disposition) && is_blank(out_name) then begin
  if disposition ne bfile then ofile=concat_dir(odir,disposition)
 endif
 
+;if file_test(ofile,/dangling) then file_delete,ofile,/allow_nonexistent
 file_move,t_ofile,ofile,/overwrite,/allow_same,/noexpand_path
 chmod,ofile,/g_read,/g_write,/u_read,/u_write,/noexpand_path,/a_execute,_extra=extra
 local_file=ofile

@@ -19,7 +19,7 @@
 ;             : PATH = input URL is a path
 ;             : NO_ACCEPT = add "Accept: none" (for testing)
 ;
-; History     : 24-Aug-2011, Zarro (ADNET) - Written
+; History     : 24-Aug-2011, Zarro (ADNET) - written
 ;                6-Feb-2013, Zarro (ADNET)
 ;               - added call to new HTTP_CONTENT function
 ;               19-Jun-2013, Zarro (ADNET) - renamed to sock_head
@@ -48,7 +48,7 @@
 ;               - initialized response code
 ;               3-Oct-2019, Zarro (ADNET)
 ;               - added call to SOCK_ERROR
-;               11-July-2025, Zarro (Retired)
+;               11-July-2025, Zarro (Cosultant/Retired)
 ;               - Added browser and redirect checks
 ;-
 
@@ -81,7 +81,7 @@ code=0
 used_browser=0b
 verbose=keyword_set(verbose)
 
-if ~is_url(url,_extra=extra,/scalar,err=err) then return,''
+if ~is_url(url,_extra=extra,verbose=verbose,/scalar,err=err) then return,''
 
 durl=url_fix(url,_extra=extra)
 stc=url_parse(durl)

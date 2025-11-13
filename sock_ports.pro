@@ -16,7 +16,6 @@
 ; Keywords    : COUNT = number of ports
 ;
 ; History     : 28 December 2015, Zarro (ADNET) - written
-;               18 September 2025, Zarro (Consultant) - fixed bug with searching PORT
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -25,7 +24,7 @@ function sock_ports,count=count
 
 count=0
 help,/files,out=out
-reg='\.([0-9]+)$'
+reg='\.([0-9]+)'
 for i=0,n_elements(out)-1 do begin
  chk=stregex(out[i],'([0-9]+) +',/ext,/sub)
  if is_number(chk[1]) then begin
