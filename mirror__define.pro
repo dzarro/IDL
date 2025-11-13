@@ -868,6 +868,7 @@ for i=0,ocount-1 do begin
  
  file_delete2,old,/recursive,err=err,/quiet
  if is_string(err) then begin
+  self->log,err,_extra=extra,/error
   err='Unable to delete directory: '+old
   self->log,err,_extra=extra,/error
  endif else self->log,'Deleting directory: '+old,_extra=extra
