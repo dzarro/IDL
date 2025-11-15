@@ -184,7 +184,7 @@ pro sock_get_main,url,out_name,clobber=clobber,local_file=local_file,no_check=no
   progress=progress,err=err,status=status,cancelled=cancelled,$
   out_dir=out_dir,_ref_extra=extra,verbose=verbose,$
   use_local_time=use_local_time,temp_dir=temp_dir,$
-  no_dir_check=no_dir_check             
+  no_dir_check=no_dir_check,keep_newer=keep_newer,quiet_clobber=quiet_clobber         
                   
 err='' & status=0
 cancelled=0b
@@ -192,8 +192,10 @@ local_file=''
 use_local_time=keyword_set(use_local_time)
 verbose=keyword_set(verbose)
 clobber=keyword_set(clobber)
+quiet_clobber=keyword_set(quiet_clobber)
+keep_newer=keyword_set(keep_newer)
 
-if ~is_url(url,_extra=extra,/scalar,err=err) then return
+if ~is_url(url,_extra=extra,/scalar,err=err,verbose=verbose) then return
 
 error=0
 catch,error
@@ -279,25 +281,31 @@ if have_file then osize=(file_info(ofile)).size > 0
 ;   (a URL query doesn't have a remote timestamp, so we don't check in
 ;   this case) 
 
-newer_file=1b
+newer_file=1b & time_change=1b
 if valid_time(rdate) && have_file then begin
  ldate=file_time(ofile,/vms)
  flocal_time=anytim2tai(ldate)
  fremote_time=anytim2tai(rdate)
+ 
  if use_local_time then fremote_time=fremote_time+ut_diff(/sec) 
  dprint,'% Remote file time: ',anytim2utc(fremote_time,/vms)
  dprint,'% Local file time: ',anytim2utc(flocal_time,/vms)
- newer_file=fremote_time gt flocal_time
- older_file=fremote_time lt flocal_time
+ time_change=flocal_time ne fremote_time
+ newer_local_file=flocal_time gt fremote_time
+ if newer_local_file and keyword_set(keep_newer) then begin
+  time_change=0b
+  if verbose then mprint,'Keeping newer local file',_extra=extra
+ endif
 endif
 
 size_change=1b
 if (bsize gt 0) && (osize gt 0) then size_change=(bsize ne osize)
-download=~have_file || clobber || size_change || newer_file || is_string(query)
+download=~have_file || clobber || size_change || time_change || is_string(query)
 
 if ~download then begin
- if older_file then rmess='Newer local file ' else rmess='Identical local file '
- mprint,rmess+ofile+' exists (not downloaded). Use /clobber to re-download.'
+
+ ;if older_file then rmess='Newer local file ' else rmess='Identical local file '
+ if verbose then mprint,ofile+' exists (not downloaded). Use /clobber to re-download.',_extra=extra
  local_file=ofile
  status=2
  return
@@ -324,8 +332,8 @@ endif
 
 ;-- download into temporary file and then rename to output file 
 
-if verbose then t1=systime(/seconds)
 t_ofile=concat_dir(get_temp_dir(),file_basename(ofile)+'_'+session_id())
+t1=systime(/seconds)
 result = ourl->Get(file=t_ofile)  
 
 ;-- check what happened
@@ -341,7 +349,7 @@ endif
 if ptr_valid(callback_data) then begin
  if (*callback_data).cancelled then begin
   err='Download cancelled.' 
-  if verbose then mprint,err
+  if verbose then mprint,err,_extra=extra
   cancelled=1b
   return
   heap_free,callback_data
@@ -411,7 +419,7 @@ if verbose then begin
  tdiff=t2-t1
  m1=trim(string(bsize,'(i10)'))+' bytes of '+file_basename(ofile)
  m2=' copied in '+strtrim(str_format(tdiff,'(f8.2)'),2)+' seconds.'
- mprint,m1+m2
+ mprint,m1+m2,_extra=extra
 endif
 
 status=1

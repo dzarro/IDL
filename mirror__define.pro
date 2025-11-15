@@ -101,6 +101,7 @@ self.dir_cache=hash()
 self.fhash=hash()
 self.dhash=hash()
 
+self->log,'Initializing mirror object',_extra=extra
 return,1                                                                                          
 end     
 
@@ -118,7 +119,7 @@ recurse=keyword_set(recurse)
 self->reset
 
 if isa(source,/string) && isa(target,/string) then begin
- self->set,source=sourcem,target=target,err=err
+ self->set,source=source,target=target,err=err
  if is_string(err) then return
 endif 
 
@@ -170,7 +171,7 @@ found=0b
 if run then self->restore_state,found=found,_extra=extra,err=err
    
 if is_blank(err) && found then begin
- if main then self->log,['Using results of last directory scan...'],_extra=extra 
+ if main then self->log,['Using results of last directory scan'],_extra=extra 
 endif else begin
 
 ;-- search target for file and directories, and cache for later
@@ -187,7 +188,7 @@ if is_string(err) then begin
 endif
 
 no_changes=self->no_changes()
-if ~run && no_changes then self->log,'No directory changes.',_extra=extra,1
+if ~run && no_changes then self->log,'No directory changes',_extra=extra,1
 
 if run then begin
  odir=self.target
@@ -232,8 +233,9 @@ if ~directory_only then begin
  if run then begin
   self->restore_state,found=found,_extra=extra,err=err
  endif 
+ 
  if is_blank(err) && found then begin
-  if main then self->log,'Using results of last file scan...',_extra=extra 
+  if main then self->log,'Using results of last file scan',_extra=extra 
  endif else begin
   self->compare,err=err,_extra=extra
   if is_blank(err) && ~run then self->save_state,_extra=extra
@@ -245,7 +247,7 @@ if ~directory_only then begin
  endif
  
  no_changes=self->no_changes()
- if ~run && no_changes then self->log,'No file changes.',_extra=extra
+ if ~run && no_changes then self->log,'No file changes',_extra=extra
  
 ;-- process files
 
@@ -270,12 +272,12 @@ if ~directory_only then begin
 ;-- save new snapshot
 
    self->snap_save,_extra=extra
-   self.snap_skip=0b
+   ;self.snap_skip=0b
   endif
  endif
 
  if run then begin
-  if ~self->snap_have() || self.snap_skip then self->snap_save,_extra=extra
+ ; if ~self->snap_have() || self.snap_skip then self->snap_save,_extra=extra
   self->delete_state,_extra=extra
  endif
  
@@ -293,7 +295,7 @@ if recurse then begin
   sdirs=self.source+'/'+ubdirs
   tdirs=concat_dir(self.target,ubdirs)
   for i=0,ucount-1 do begin 
-   self->set,source=sdirs[i],target=tdirs[i],/no_check
+   self->set,source=sdirs[i],target=tdirs[i]
    self->mirror,run=run,recurse=recurse,_extra=extra,$
        directory_only=directory_only,/append 
   endfor
@@ -310,7 +312,7 @@ if main then begin
    status=write_ascii(self.update_log,self->get_log())  ;,/update)
    self->log,'Wrote log file to: '+self.update_log,_extra=extra
   endif
- endif else print,'% Use /run to execute actual mirror.'
+ endif else print,'% Use /run to execute actual mirror'
 endif
 
 if arg_present(log) then log=self->get_log()
@@ -336,8 +338,8 @@ end
 pro mirror::save_state,_ref_extra=extra
 
 state={new:self->new(),old:self->old(),diff:self->diff(),ulist:self->ulist(),target:self.target,get_patt:self.get_patt,slist:self->slist(),$
-       local_ignore:self.local_ignore,no_deletes:self.no_deletes,exclude_patt:self.exclude_patt,$
-	   snap_skip:self.snap_skip}
+       local_ignore:self.local_ignore,no_deletes:self.no_deletes,exclude_patt:self.exclude_patt}
+	;   snap_skip:self.snap_skip}
 	 
 update_hash,self->hash(_extra=extra),self.target,state,_extra=extra; ,/no_copy
 
@@ -353,14 +355,14 @@ found=0b
 update_hash,self->hash(_extra=extra),self.target,state,_extra=extra,err=err,/get
 
 if is_string(err) || ~is_struct(state) then begin
- if ~is_struct(state) then self->log,'No saved scan found',_extra=extra
+ if ~is_struct(state) then self->log,'No previous scan found',_extra=extra,/no_repeat
  if is_string(err) then self->log,err,_extra=extra,/error
  return
 endif
 
 if self->same_state(state,_extra=extra) then begin
  self->set,new=state.new,old=state.old,diff=state.diff,ulist=state.ulist,slist=state.slist
- self.snap_skip=state.snap_skip
+ ;self.snap_skip=state.snap_skip
  found=1b
 endif
 
@@ -481,31 +483,36 @@ end
 ;---------------------------------------------------------------
 ;-- check if source and directory snapshots are different
 
-pro mirror::snap_compare,diff,_ref_extra=extra,status=status,err=err
+pro mirror::snap_compare,diff,_ref_extra=extra,err=err
 
 err=''
-status=0b
 diff=''
 
 source=self.source & target=self.target
 
 ;-- check for snapshot file
 
-if ~self->snap_have() then return
-sfile=self->snap_file()
-sdiff=self->snap_diff(sfile,_extra=extra)
-if sdiff gt 24. then begin
- self.snap_skip=1b
+if ~self->snap_have() then begin
+ err='No snap_shot file found'
+ self->log,err,_extra=extra,/error
  return
 endif
+
+sfile=self->snap_file()
+
+;sdiff=self->snap_diff(sfile,_extra=extra)
+;if sdiff gt 24. then begin
+; self.snap_skip=1b
+; return
+;endif
 
 ;-- compare with latest saved snapshots
 
 restore,file=sfile
 
-if is_blank(get_patt_sav) then get_patt_sav=''
-if is_blank(local_ignore_sav) then local_ignore_sav=''
-if ~isa(no_deletes_sav,/bool) then no_deletes_sav=boolean(0)
+;if is_blank(get_patt_sav) then get_patt_sav=''
+;if is_blank(local_ignore_sav) then local_ignore_sav=''
+;if ~isa(no_deletes_sav,/bool) then no_deletes_sav=0b
 
 ;-- if previous run used file patterns, then skip checking snapshots
 
@@ -519,12 +526,16 @@ if ~isa(no_deletes_sav,/bool) then no_deletes_sav=boolean(0)
 ;-- get current source snapshot
 
 self->snap_url,source,snap_source,err=err,_extra=extra,count=scount,/cache
-if is_string(err) || (scount eq 0) then return
+if is_string(err) then return
+
+;|| (scount eq 0) then return
 
 ;-- get current target snapshot
 
 self->snap_dir,target,snap_target,err=err,_extra=extra,count=tcount,/cache
-if is_string(err) || (tcount eq 0) then return
+if is_string(err) then return
+
+;|| (tcount eq 0) then return
 
 ;-- compare snapshots
 
@@ -559,15 +570,15 @@ if ~same_target then begin
    ;if tname eq self->snap_name() then continue
    if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
    ;tfile=concat_dir(target,tname)
-   ;if ~file_test(tfile,/reg) then continue
-   if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
+   if file_test(tfile,/reg) || self->is_link(tfile) then begin
+    if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
+   endif
   endfor 
  endif
 endif
 
 ncount=self->ncount()
 ocount=self->ocount()
-
 tfiles=[temporary(dsfiles),temporary(dtfiles)]
 dfiles=rem_blanks(get_uniq(tfiles),count=dcount)
 
@@ -577,10 +588,9 @@ if (dcount gt 0) && (ocount gt 0) then dfiles=str_remove(dfiles,file_basename(se
 if dcount gt 0 then begin
  if dcount eq 1 then dfiles=dfiles[0]
  diff=source+'/'+dfiles
- self->log,['Source and target have different snapshots.'],_extra=extra
-endif else self->log,['Source and target have identical snapshots.'],_extra=extra
+ self->log,['Source and target have different snapshots'],_extra=extra
+endif else self->log,['Source and target have identical snapshots'],_extra=extra
 
-status=1b
 return
 end
 
@@ -594,7 +604,11 @@ files_requested=arg_present(files)
 dirs_requested=arg_present(dirs)
 files='' & dirs='' & fcount=0L & dcount=0L
 
-if ~self->is_dir(dir,_extra=extra) then return
+if is_blank(dir) then return
+if ~file_test(dir,/directory,_extra=extra) then return
+
+;if ~self->is_dir(dir,_extra=extra) then return
+
 sdir=local_name(dir)
 
 ;-- empty caches if requested 
@@ -769,27 +783,26 @@ return & end
 ;-------------------------------------------------------------
 ;-- get snapshot of URL
 
-pro mirror::snap_url,url,listing,_ref_extra=extra,err=err,count=count
+pro mirror::snap_url,url,listing,_ref_extra=extra,count=count
 
 err='' & count=0
 
 listing=self->slist()
 if listing[0] eq 'No data' then begin
- err='No remote/source snapshot files'
  listing=''
  return
 endif
 
-err='' & count=n_elements(listing)
+count=n_elements(listing)
 
 return & end
 
 ;-----------------------------------------------------------
 ;-- get snapshot of directory
 
-pro mirror::snap_dir,dir,listing,_ref_extra=extra,err=err,count=count
+pro mirror::snap_dir,dir,listing,_ref_extra=extra,count=count
 
-count=0 & listing='' & err='No local/target snapshot files'
+count=0 & listing='' 
 
 self->file_search,dir,files=files,fcount=count,_extra=extra
 ;self->list_files,dir,files,count=count,_extra=extra
@@ -816,15 +829,16 @@ return & end
 pro mirror::snap_save,err=err,_ref_extra=extra
 
 err=''
-error=0
-catch,error
-if (error ne 0) then begin
- err=err_state()
- catch, /cancel
- message,/reset
- self->log,err,_extra=extra,/error
- return
-endif
+
+;error=0
+;catch,error
+;if (error ne 0) then begin
+; err=err_state()
+;catch, /cancel
+;message,/reset
+;self->log,err,_extra=extra,/error
+;return
+;endif
 
 source=self.source & target=self.target
 if is_blank(source) || is_blank(target) then return
@@ -839,12 +853,14 @@ if is_string(err) then return
 self->snap_dir,target,snap_target_sav,err=err,_extra=extra,cache=0b
 if is_string(err) then return
 
-get_patt_sav=self.get_patt
-local_ignore_sav=self.local_ignore
-no_deletes_sav=self.no_deletes
+;get_patt_sav=self.get_patt
+;local_ignore_sav=self.local_ignore
+;no_deletes_sav=self.no_deletes
 
-self->log,'Saving new snapshot to: '+sfile,_extra=extra,1
-save,file=sfile,snap_source_sav,snap_target_sav,get_patt_sav,local_ignore_sav,no_deletes_sav
+self->log,'Saving new snapshot to: '+sfile,_extra=extra
+save,file=sfile,snap_source_sav,snap_target_sav
+
+;get_patt_sav,local_ignore_sav,no_deletes_sav
 
 return & end
 ;----------------------------------------------------------------
@@ -858,7 +874,7 @@ windows=is_windows()
 for i=0,ocount-1 do begin
 
  old=local_name(dir[chk[i]])
- if self->is_link(old) && self.keep_links then continue
+ if self.keep_links && self->is_link(old,/dir) then continue
  
  ;if windows then check=0b else check=file_test(old,/dir,/sym)
  ;if check then begin
@@ -919,7 +935,7 @@ for i=0,ocount-1 do begin
  ;continue
  ;endif
  
- if self->is_link(old) && self.keep_links then continue
+ if self.keep_links && self->is_link(old,/file) then continue
  
  file_delete2,old,err=err,/quiet  
  if is_blank(err) then self->log,'Deleting file: '+old,_extra=extra else begin
@@ -998,7 +1014,8 @@ endif
 
 if ~self.do_directory then item='files' else item='directories'
 
-self->log,['Searching for '+item+' in: '+self.target],_extra=extra ;,self.do_directory
+if self.do_directory then self->log,['','Searching for '+item+' in: '+self.target],_extra=extra else $
+ self->log,['Searching for '+item+' in: '+self.target],_extra=extra
 
 self->search_url,self.source,out,_extra=extra,err=err,count=count
 if is_string(err) then return
@@ -1026,10 +1043,9 @@ end
 
 pro mirror::search_dir,dir,out,count=count,_ref_extra=extra
 
-count=0l
-out=''
-if ~self->is_dir(dir,_extra=extra) then return
-
+;count=0l
+;out=''
+;if ~self->is_dir(dir,_extra=extra) then return
 ;if ~file_test(dir,/read,/noexpand_path) then begin
 ; chmod,dir,/noexpand_path,/u_read
 ; if ~file_test(dir,/read,/noexpand_path) then self->log,'Warning - denied read access to: '+dir,_extra=extra
@@ -1178,7 +1194,8 @@ if ~direct then begin
  if is_string(ignore_files) && (self->scount() gt 0) then begin
   excl=str_local(ignore_files,/unix)
   sfiles=self->source()
-  snames=self->basename(self.source,sfiles)
+  ;snames=self->basename(self.source,sfiles)
+  snames=file_basename(sfiles)
   out=str_remove(snames,excl,_extra=extra,/regex,count=count,index=index)
   if count gt 0 then begin
    if count le self->scount() then sfiles=sfiles[index]
@@ -1194,6 +1211,7 @@ function mirror::strip_url,names
 
 if ~isa(names,/string) then return,''
 if ~self->is_url(self.source) || is_blank(self.url) then return,names
+
 len=strlen(self.url)
 slens=max(strlen(names))
 snames=strmid(names,len,slens)
@@ -1340,17 +1358,18 @@ err=''
 diff=''
 self->set,old='',new='',diff=diff
 
-
 scount=self->scount()
 if scount gt 0 then begin
  sout=self->source()
- sbout=self->basename(self.source,sout)
+; sbout=self->basename(self.source,sout)
+ sbout=file_basename(sout)
 endif
 
 tcount=self->tcount()
 if tcount gt 0 then begin
  tout=self->target()
- tbout=self->basename(self.target,tout)
+ ;tbout=self->basename(self.target,tout)
+ tbout=file_basename(tout)
 endif
 
 ;-- look for new/defunct directories
@@ -1391,7 +1410,7 @@ endif
 ;-- look for new/defunct/modified files
 
 if ~self.do_directory then begin
- self.snap_skip=0b
+ ;self.snap_skip=0b
  case 1 of
   (tcount eq 0) && (scount eq 0): do_nothing=1
   (tcount eq 0) && (scount gt 0): self->set,new=sout
@@ -1419,14 +1438,13 @@ if ~self.do_directory then begin
    if ~self.no_snapshot && self->snap_have() then begin
     stime=file_time(self->snap_file())
     self->log,'Checking last snapshot taken at '+stime+' found in: '+self.target,_extra=extra,1
-    self->snap_compare,diff,_extra=extra,status=status,err=err
-    if is_string(err) then return  
-    if status then begin
+    self->snap_compare,diff,_extra=extra,err=err
+    if is_blank(err) then begin
      self->set,diff=diff
      return
-    endif
+    endif else self->log,'Problems with last with snapshot',_extra=extra,/error
    endif
-    
+   
 ;-- check all source/target file for differences
       
    self->log,'Checking times/sizes of files in: '+self.target,_extra=extra
@@ -1459,7 +1477,8 @@ if ~self.do_directory then begin
     endif
    endfor
    self->set,diff=diff
-   if is_blank(diff) then self->log,'All files up to date',_extra=extra
+   ;if is_blank(diff) then self->log,'All files up to date',_extra=extra
+   dcount=self->dcount()
   end
  endcase
 
@@ -1527,15 +1546,22 @@ return & end
 ;--------------------------------------------------------------------------
 ;-- check if file or directory is a link (regular or dangling)
 
-function mirror::is_link,item,_ref_extra=extra
+function mirror::is_link,item,_ref_extra=extra,file=file,directory=directory
 
 if is_blank(item) || is_windows() then return,0b
 stat=file_info(item)
 
-lchk=stat.symlink
-dchk=stat.dangling_symlink
+sym=stat.symlink
+dang=stat.dangling_symlink
+lfile=stat.regular
+ldir=stat.directory
 
-return,lchk || dchk
+if keyword_set(file) && lfile && sym && dang then return,1b
+if keyword_set(directory) && ldir && sym && dang then return,1b
+if sym && dang then return,1b
+
+return,0b
+
 end
 
 ;--------------------------------------------------------------------------
@@ -1585,7 +1611,7 @@ return,efile
 end
 
 ;--------------------------------------------------------------------------
-;-- copy or download file (if URL)
+;-- download files
 
 pro  mirror::copy,file,err=err,_ref_extra=extra
 
@@ -1597,23 +1623,22 @@ if count eq 0 then return
 
 odir=self.target
 
-;if ~file_test(odir,/write) then begin
-;err='Denied write access to directory: '+odir
-; self->log,err,_extra=extra,/err
-;return
-;endif
+if ~file_test(odir,/write) then begin
+ err='Denied write access to directory: '+odir
+ self->log,err,_extra=extra,/err
+ return
+endif
 
 for i=0,count-1 do begin
  sfile=file[chk[i]]
- item=concat_dir(odir,file_basename(sfile))
- 
+ ;item=concat_dir(odir,file_basename(sfile))
+ item=file_basename(sfile)
  ;current=file_test(item,/regular)
  ;mode='Updating: '
  ;if ~current then mode='Copying: '
  ;if self->is_url(sfile) then if ~current then mode='Downloading: '
- 
- mode='Checking: '
- self->log,mode+item,_extra=extra
+ ;mode='Downloading: '
+ ;self->log,mode+item,_extra=extra
 
 ;-- verify write access to file
 
@@ -1637,18 +1662,18 @@ for i=0,count-1 do begin
   continue
  endif
 
- if self->is_url(sfile) then begin
-  rfile=self->encode(sfile)
-  sock_get,rfile,out=odir,local=local,no_check=~self.force,/quiet,err=err,_extra=extra,/no_dir_check
-  if is_blank(err) then begin
-   alocal=ascii_decode(local)
-   if alocal ne local then file_rename,local,alocal,err=err,_extra=extra
-  endif
- endif else begin
-  file_copy,sfile,odir,/force,/overwrite,/allow_same
-  file_touch,item,sfile,err=err
-  chmod,item,/u_read,/u_write,/g_read,/g_write,/a_execute
- endelse
+ rfile=self->encode(sfile)
+ sock_get,rfile,out=odir,local=local,no_check=self.force,/disable,err=err,_extra=extra,/no_dir_check,status=status
+ stats=[0,1,2]
+ mstats=['Download failed:','Download succeeded:','Download skipped (files identical):']+' '+item
+ mout=''
+ schk=where(status eq stats,scount)
+ if scount gt 0 then mout=mstats[schk[0]]
+ self->log,mout,_extra=extra
+ if is_blank(err) then begin
+  alocal=ascii_decode(local)
+  if alocal ne local then file_rename,local,alocal,err=err,_extra=extra
+ endif
 
  if is_string(err) then self->log,err,_extra=extra,/error
 
@@ -1662,7 +1687,7 @@ end
 
 pro mirror::set,target=target,source=source,do_directory=do_directory,$
                 tdirs=tdirs,sdirs=sdirs,tfiles=tfiles,sfiles=sfiles,log=log,$
-                err=err,no_check=no_check,local_ignore=local_ignore,$
+                err=err,local_ignore=local_ignore,$
                 get_patt=get_patt,no_deletes=no_deletes,force=force,no_snapshot=no_snapshot,$
                 keep_directories=keep_directories,update_log=update_log,keep_links=keep_links,$
                 exclude_patt=exclude_patt,new=new,old=old,diff=diff,ulist=ulist,slist=slist
@@ -1676,13 +1701,12 @@ if isa(source,/string) then begin
  endif
  if self->is_url(source) then begin
   source=str_replace(source,'\','/')
-  if keyword_set(no_check) then self.source=source else begin
-   sock_redirect,source,location,err=err,/verbose,/full_path
-   if is_string(err) then return
-   if is_string(location) then self.source=location else self.source=source
-   url=url_parse(self.source)
-   self.url=url.scheme+'://'+url.host
-  endelse
+  chk=have_network(source,location=location,/verbose,/full_path,err=err,interval=3600.)
+  ; sock_redirect,source,location,err=err,/verbose,/full_path
+  if is_string(err) || ~chk then return
+  if is_string(location) then self.source=location else self.source=source
+  url=url_parse(self.source)
+  self.url=url.scheme+'://'+url.host
  endif else begin
   err='Source must be a valid URL.'
   mprint,err
@@ -2021,7 +2045,7 @@ pro mirror__define
 void={mirror, $                                                                                       
      source:'',$              ;-- source directory or URL to mirror from                                                                          
      target:'',$              ;-- target directory to mirror to
-     do_directory:boolean(0),$
+     do_directory:0b,$
      tdirs:ptr_new(), $
      sdirs:ptr_new(), $
      sfiles:ptr_new(),$
@@ -2034,12 +2058,12 @@ void={mirror, $
      local_ignore:'',$
      get_patt:'',$
      exclude_patt:'',$
-     no_deletes:boolean(0),$
-     force:boolean(0),$
-     no_snapshot:boolean(0),$
-	 snap_skip:0b,$
-     keep_directories:boolean(0),$
-     keep_links:boolean(0),$
+     no_deletes:0b,$
+     force:0b,$
+     no_snapshot:0b,$
+;	 snap_skip:0b,$
+     keep_directories:0b,$
+     keep_links:0b,$
      update_log:'',$
      url:'',$
      file_cache:hash(),$

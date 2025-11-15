@@ -56,7 +56,7 @@ endif else begin
  if obj_valid(sav_m) then obj_destroy,sav_m
 endelse
 
-if ~obj_valid(m) then m=obj_new('mirror')
+if ~obj_valid(m) then m=obj_new('mirror',_extra=extra)
  
 if strpos(target,'$SSW') gt -1 then begin
  temp=str_rep(target,'$SSW','')
