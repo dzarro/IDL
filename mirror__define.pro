@@ -337,9 +337,10 @@ end
 ;---------------------------------------------------------------
 pro mirror::save_state,_ref_extra=extra
 
-state={new:self->new(),old:self->old(),diff:self->diff(),ulist:self->ulist(),target:self.target,get_patt:self.get_patt,slist:self->slist(),$
-       local_ignore:self.local_ignore,no_deletes:self.no_deletes,exclude_patt:self.exclude_patt}
-	;   snap_skip:self.snap_skip}
+state={new:self->new(),old:self->old(),diff:self->diff(),ulist:self->ulist(),$
+       target:self.target,source:self.source,slist:self->slist()}
+        ; get_patt:self.get_patt,local_ignore:self.local_ignore,no_deletes:self.no_deletes,exclude_patt:self.exclude_patt,$
+	; snap_skip:self.snap_skip}
 	 
 update_hash,self->hash(_extra=extra),self.target,state,_extra=extra; ,/no_copy
 
@@ -375,9 +376,12 @@ end
 function mirror::same_state,state,_extra=extra
 
 if ~is_struct(state) then return,0b
-same=(state.target eq self.target) && (state.no_deletes eq self.no_deletes) && $
-     (state.get_patt eq self.get_patt) && (state.local_ignore eq self.local_ignore) && $
-     (state.exclude_patt eq self.exclude_patt)	 
+
+same=(state.target eq self.target) && (state.source eq self.source)
+    ; (state.no_deletes eq self.no_deletes) && $
+    ; (state.get_patt eq self.get_patt) && (state.local_ignore eq self.local_ignore) && $
+    ; (state.exclude_patt eq self.exclude_patt)	
+     
 return,same
 end
 
@@ -1084,6 +1088,8 @@ return & end
 
 pro mirror::filter,_ref_extra=extra,err=err,ignore_directories=ignore_directories,ignore_files=ignore_files
 
+mprint,get_caller()
+
 err=''
 direct=self.do_directory
 windows=is_windows()
@@ -1701,7 +1707,7 @@ if isa(source,/string) then begin
  endif
  if self->is_url(source) then begin
   source=str_replace(source,'\','/')
-  chk=have_network(source,location=location,/verbose,/full_path,err=err,interval=3600.)
+  chk=have_network(source,location=location,/full_path,err=err,interval=60.)
   ; sock_redirect,source,location,err=err,/verbose,/full_path
   if is_string(err) || ~chk then return
   if is_string(location) then self.source=location else self.source=source
