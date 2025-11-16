@@ -18,7 +18,7 @@
 ; Keywords    : LOCAL_FILE = Full name of copied file
 ;               OUT_DIR = Output directory to download file
 ;               CLOBBER = Clobber existing file
-;               STATUS = 0/1/2 fail/success/file exists
+;               STATUS = 0/1/2/3 fail/success/file exists/canceled
 ;               CANCELLED = 1 if download cancelled
 ;               PROGRESS = Show download progress
 ;               NO_CHECK = don't check remote server for valid URL.
@@ -31,6 +31,7 @@
 ;               TEMP_DIR = set to download to system TEMP directory
 ;               NO_DIR_CHECK = set to skip checking if OUT_DIR exist
 ;               and is writeable.
+;               KEEP_NEWER = do not download if local file is newer (unless /CLOBBER is set)
 ;
 ; History     : 27-Dec-2009, Zarro (ADNET) - written
 ;                8-Oct-2010, Zarro (ADNET) - dropped support for
@@ -130,8 +131,10 @@
 ;               - added /TEMP_DIR
 ;               11-May-2022, Zarro (ADNET)
 ;               - added /NO_DIR_CHECK
-;               11-July-2025, Zarro (Consultant/Retired)
+;               11-Jul-2025, Zarro (Consultant/Retired)
 ;               - added check for gzip encoded remote file
+;               11-Nov-2025, Zarro (Consultant/Retired)
+;                - added KEEP_NEWER
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -184,7 +187,7 @@ pro sock_get_main,url,out_name,clobber=clobber,local_file=local_file,no_check=no
   progress=progress,err=err,status=status,cancelled=cancelled,$
   out_dir=out_dir,_ref_extra=extra,verbose=verbose,$
   use_local_time=use_local_time,temp_dir=temp_dir,$
-  no_dir_check=no_dir_check,keep_newer=keep_newer,quiet_clobber=quiet_clobber         
+  no_dir_check=no_dir_check,keep_newer=keep_newer         
                   
 err='' & status=0
 cancelled=0b
@@ -192,7 +195,6 @@ local_file=''
 use_local_time=keyword_set(use_local_time)
 verbose=keyword_set(verbose)
 clobber=keyword_set(clobber)
-quiet_clobber=keyword_set(quiet_clobber)
 keep_newer=keyword_set(keep_newer)
 
 if ~is_url(url,_extra=extra,/scalar,err=err,verbose=verbose) then return
@@ -200,10 +202,11 @@ if ~is_url(url,_extra=extra,/scalar,err=err,verbose=verbose) then return
 error=0
 catch,error
 if (error ne 0) then begin
- mprint,err_state()
+ err=err_state()
+ mprint,err,_extra=extra
  catch, /cancel
  message,/reset  
- goto,bail  
+ return
 endif
   
 stc=url_parse(url)
@@ -215,35 +218,52 @@ if is_blank(file) then file=str_replace(stc.host,'.','_')
 
 ;-- default copying file with same name to current directory
 
-if keyword_set(temp_dir) then odir=get_temp_dir() else odir=curdir()
-ofile=file
 if n_elements(out_name) gt 1 then begin
  err='Output filename must be scalar string.'
- mprint,err
+ mprint,err,_extra=extra
  return
 endif
 
+ofile=file & odir=curdir()
 if is_string(out_name) then begin
- tdir=file_dirname(out_name)
- if is_blank(tdir) || tdir eq '.' then tdir=curdir()
- if is_string(tdir) then odir=tdir 
- ofile=file_basename(out_name)
+ tname=local_name(out_name)
+ tdir=file_dirname(tname)
+ if is_string(tdir) && tdir ne '.' then odir=tdir
+ tfile=file_basename(out_name) 
+ if is_string(tfile) then ofile=tfile
 endif
 
-if is_string(out_dir) then odir=out_dir
-
+if keyword_set(temp_dir) then odir=get_temp_dir()
+if is_string(out_dir) then odir=local_name(out_dir)
 if ~keyword_set(no_dir_check) then begin
  if ~file_test(odir,/direct) then begin
   err='Non-existent directory - '+odir
-  mprint,err
+  mprint,err,_extra=extra
   return
  endif
-
- if ~file_test(odir,/direct,/write) then begin
+ if ~file_test(odir,/write) then begin
   err='No write access to directory - '+odir
-  mprint,err
+  mprint,err,_extra=extra
   return
  endif
+endif
+
+;-- check write access to output file
+
+ofile=concat_dir(odir,ofile)
+oinfo=file_info(ofile)
+have_file=oinfo.exists
+if have_file && ~file_test(ofile,/write) then begin
+ err='No write access to file - '+ofile
+ mprint,err,_extra=extra
+ return
+endif
+ 
+if verbose then mprint,'Downloading to: '+ofile,_extra=extra
+osize=0l & otime=0.
+if have_file then begin
+ osize=oinfo.size
+ otime=file_time(ofile,/tai)
 endif
 
 bsize=0l & chunked=0b & ok=1b & rdate='' & code=404 & disposition=''
@@ -261,51 +281,45 @@ if pre_check then begin
                 location=location,verbose=verbose,used_browser=used_browser)
  if ~chk then begin
   if is_blank(err) then err='URL unavailable.'
-  mprint,err
+  mprint,err,_extra
   return
  endif		
  if is_string(location) then durl=location
  if is_string(disposition) then ofile=disposition
 endif
 
-;-- if file exists, download a new one if /clobber or local size or time
-;   differs from remote
-
-ofile=local_name(concat_dir(odir,ofile))
-osize=0l
-chk=file_search(ofile,count=fcount)
-have_file=fcount eq 1
-if have_file then osize=(file_info(ofile)).size > 0
-
 ;-- check if remote file is newer
 ;   (a URL query doesn't have a remote timestamp, so we don't check in
 ;   this case) 
 
-newer_file=1b & time_change=1b
+newer_local_file=0b & time_change=1b & size_change=1b
 if valid_time(rdate) && have_file then begin
  ldate=file_time(ofile,/vms)
  flocal_time=anytim2tai(ldate)
  fremote_time=anytim2tai(rdate)
- 
  if use_local_time then fremote_time=fremote_time+ut_diff(/sec) 
  dprint,'% Remote file time: ',anytim2utc(fremote_time,/vms)
  dprint,'% Local file time: ',anytim2utc(flocal_time,/vms)
  time_change=flocal_time ne fremote_time
  newer_local_file=flocal_time gt fremote_time
- if newer_local_file and keyword_set(keep_newer) then begin
-  time_change=0b
-  if verbose then mprint,'Keeping newer local file',_extra=extra
- endif
 endif
 
-size_change=1b
+;-- if file exists, download a new one if /CLOBBER or local size or time
+;   differs from remote (unless KEEP_NEWER is set)
+
+if newer_local_file && keyword_set(keep_newer) && ~clobber then begin
+ if verbose then mprint,'Keeping newer local file',_extra=extra
+ local_file=ofile
+ status=1
+ return
+endif
+ 
 if (bsize gt 0) && (osize gt 0) then size_change=(bsize ne osize)
 download=~have_file || clobber || size_change || time_change || is_string(query)
-
 if ~download then begin
-
- ;if older_file then rmess='Newer local file ' else rmess='Identical local file '
- if verbose then mprint,ofile+' exists (not downloaded). Use /clobber to re-download.',_extra=extra
+ if verbose then begin
+  mprint,ofile+' exists (not downloaded). Use /clobber to re-download.',_extra=extra
+ endif
  local_file=ofile
  status=2
  return
@@ -338,8 +352,6 @@ result = ourl->Get(file=t_ofile)
 
 ;-- check what happened
 
-bail: 
-
 if obj_valid(ourl) then begin
  sock_message,ourl,disposition=disposition,date=rdate,size=bsize,encoding=encoding,_extra=extra,$
               code=code,verbose=verbose,err=err
@@ -351,12 +363,27 @@ if ptr_valid(callback_data) then begin
   err='Download cancelled.' 
   if verbose then mprint,err,_extra=extra
   cancelled=1b
+  status=3
   return
   heap_free,callback_data
  endif
 endif
 
-;-- check for all failure possibilities
+if have_file && keep_newer && valid_time(rdate) && ~clobber then begin
+ flocal_time=otime
+ fremote_time=anytim2tai(rdate)
+ if use_local_time then fremote_time=fremote_time+ut_diff(/sec) 
+ time_change=flocal_time ne fremote_time
+ newer_local_file=flocal_time gt fremote_time
+ if newer_local_file then begin
+  if verbose then mprint,'Keeping newer local file',_extra=extra
+  local_file=ofile
+  status=1
+  return
+ endif
+endif
+ 
+;-- check for likely failure possibilities
 
 chk=file_info(t_ofile)
 tsize=chk.size
@@ -365,7 +392,7 @@ case 1 of
  scode ne '2': if is_blank(err) then err='Download failed.'
  ~chk.exists && (bsize eq 0l): begin
   status=1
-  if verbose then mprint,'Remote file has zero byte size.'
+  if verbose then mprint,'Remote file has zero byte size.',_extra=extra
   file_create,t_ofile
  end
  ~chk.exists && (bsize gt 0): err='File not written to disk (check write access).'
@@ -373,13 +400,13 @@ case 1 of
  (bsize gt 0) && (tsize gt 0) && (tsize ne bsize): err='File failed to download completely (possible network timeout).'
  is_blank(result): err='Download interrupted (try again).'
  is_string(derr): err=derr
-else: status=1
+ else: status=1
 endcase
 
 if (status eq 0) then begin
  if is_blank(err) then err='Download failed for unknown reasons.'
  if is_string(t_ofile) then file_delete,t_ofile,/quiet,/noexpand_path,/allow_nonexistent
- mprint,err 
+ mprint,err,_extra=extra
  return
 endif
 
@@ -400,8 +427,10 @@ if is_string(disposition) && is_blank(out_name) then begin
  if disposition ne bfile then ofile=concat_dir(odir,disposition)
 endif
 
-;if file_test(ofile,/dangling) then file_delete,ofile,/allow_nonexistent
-file_move,t_ofile,ofile,/overwrite,/allow_same,/noexpand_path
+;file_move,t_ofile,ofile,/overwrite,/allow_same,/noexpand_path
+
+file_copy,t_ofile,ofile,/force,/allow_same,/overwrite,_extra=extra
+file_delete,t_ofile,/allow_nonexistent,_extra=extra
 chmod,ofile,/g_read,/g_write,/u_read,/u_write,/noexpand_path,/a_execute,_extra=extra
 local_file=ofile
 
@@ -442,14 +471,14 @@ err='' & status=0 & cancelled=0b & local_file=''
 
 np=n_elements(url)
 if np eq 0 then begin
- mprint,'Undefined input URL.'
+ mprint,'Undefined input URL.',_extra=extra
  return
 endif
 
 if is_string(out_name) then begin
  if (n_elements(out_name) ne np) then begin
   err='Number of elements of output file name and input URL must match.'
-  mprint,err
+  mprint,err,_extra=extra
   return
  endif
 endif else out_name=strarr(np)

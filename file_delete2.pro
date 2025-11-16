@@ -21,12 +21,10 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
 
-pro file_delete2,files,_extra=extra,err=err,verbose=verbose,quiet=quiet
+pro file_delete2,files,_extra=extra,err=err,verbose=verbose
 
 err=''
 if is_blank(files) then return
-quiet=keyword_set(quiet)  
-verbose=keyword_set(verbose)
 
 for i=0,n_elements(files)-1 do begin
  err=''
@@ -34,7 +32,7 @@ for i=0,n_elements(files)-1 do begin
  catch,error
  if error ne 0 then begin
   err=err_state()
-  if ~quiet then mprint,err
+  if verbose then mprint,err,_extra=extra
   message,/reset
   catch,/cancel
   continue
@@ -51,7 +49,8 @@ for i=0,n_elements(files)-1 do begin
  ;endif else begin
  
  if is_direc then begin
-  if file_dirname(tfile) eq '.' then tfile=concat_dir(curdir(),tfile)
+  fdir=file_dirname(tfile)
+  if (fdir eq '.') || (fdir eq '') then tfile=concat_dir(curdir(),tfile)
  endif
  file_delete,tfile,_extra=extra,/allow_nonexistent,verbose=verbose
 

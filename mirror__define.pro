@@ -171,7 +171,7 @@ found=0b
 if run then self->restore_state,found=found,_extra=extra,err=err
    
 if is_blank(err) && found then begin
- if main then self->log,['Using results of last directory scan'],_extra=extra 
+ if main then self->log,['Using results of last directory search'],_extra=extra 
 endif else begin
 
 ;-- search target for file and directories, and cache for later
@@ -235,7 +235,7 @@ if ~directory_only then begin
  endif 
  
  if is_blank(err) && found then begin
-  if main then self->log,'Using results of last file scan',_extra=extra 
+  if main then self->log,'Using results of last file search',_extra=extra 
  endif else begin
   self->compare,err=err,_extra=extra
   if is_blank(err) && ~run then self->save_state,_extra=extra
@@ -303,7 +303,7 @@ if recurse then begin
 endif
 
 if main then begin
- if run then rmess='Mirror' else rmess='Scan'
+ if run then rmess='Mirror' else rmess='Search'
  self->log,['',rmess+' completed at: '+!stime],_extra=extra
  etime=anytim2tai(!stime)
  self->log,'Elapsed time (secs) = '+trim2(str_format(etime-stime,'(f12.2)')),_extra=extra
@@ -356,7 +356,7 @@ found=0b
 update_hash,self->hash(_extra=extra),self.target,state,_extra=extra,err=err,/get
 
 if is_string(err) || ~is_struct(state) then begin
- if ~is_struct(state) then self->log,'No previous scan found',_extra=extra,/no_repeat
+ if ~is_struct(state) then self->log,'No previous search results found',_extra=extra,/no_repeat
  if is_string(err) then self->log,err,_extra=extra,/error
  return
 endif
@@ -943,6 +943,7 @@ for i=0,ocount-1 do begin
  
  file_delete2,old,err=err,/quiet  
  if is_blank(err) then self->log,'Deleting file: '+old,_extra=extra else begin
+  self->log,err,_extra=extra,/error
   err='Unable to delete file: '+old
   self->log,err,_extra=extra,/error
  endelse
@@ -1087,8 +1088,6 @@ return & end
 ;-- filter directories & files
 
 pro mirror::filter,_ref_extra=extra,err=err,ignore_directories=ignore_directories,ignore_files=ignore_files
-
-mprint,get_caller()
 
 err=''
 direct=self.do_directory
@@ -1680,7 +1679,6 @@ for i=0,count-1 do begin
   alocal=ascii_decode(local)
   if alocal ne local then file_rename,local,alocal,err=err,_extra=extra
  endif
-
  if is_string(err) then self->log,err,_extra=extra,/error
 
 endfor
