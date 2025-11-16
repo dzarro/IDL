@@ -29,13 +29,13 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-pro mprint,mess,_extra=extra,noname=noname,informational=informational,debug=debug,$
-  allow_blank=allow_blank,disable=disable
+pro mprint,mess,_extra=extra,noname=noname,allow_blank=allow_blank,disable=disable
 
 if keyword_set(disable) then return
 blank=keyword_set(allow_blank)
-if keyword_set(debug) && (getenv('DEBUG') eq '') then return
-if keyword_set(informational) && (!quiet eq 1) then return
+
+;if keyword_set(debug) && (getenv('DEBUG') eq '') then return
+;if keyword_set(informational) && (!quiet eq 1) then return
 
 if ~blank && is_blank(mess) then return
 np=n_elements(mess)
