@@ -16,7 +16,6 @@
 ; Keywords    : /ACCESS = return access time
 ;               /UTC = return time in UTC [def is local]
 ;               /TAI = return time TAI format
-;               /HTTP = return time in HTTP time format
 ;               
 ; History     : Written, 15-Nov-2014, Zarro (ADNET)
 ;               8-Mar-2019, Zarro (ADNET)
@@ -25,33 +24,30 @@
 ;                - added FILE_MODTIME
 ;               6-May-2020, Zarro (ADNET)
 ;                - corrected bug with converting to UTC when using TAI
-;               8-Sep-2025, Zarro (Retired)
-;                - added HTTP keyword
+;               16-Nov-2025, Zarro (Consultant/Retired) - added support for environment variables in file name    
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
 
 function file_time,file,time,access=access,creation=creation,$
-               err=err,_extra=extra,tai=tai,utc=utc,http=http
+               err=err,_extra=extra,tai=tai,utc=utc
 
 forward_function file_modtime
 
-if (n_elements(file) ne 1) || is_blank(file) then begin
- err='Input must be scalar string.'
+if ~scalar_string(file,err=err) then begin
  mprint,err
  return,''
 endif
 
-chk=file_search(file,count=fcount,/fully_qualify,/expand_envir)
-if fcount ne 1 then begin
+dfile=local_name(file)
+info=file_info(dfile)
+if ~info.exists then begin
  err='Input not found.' 
  mprint,err & return,''
 endif
 
-dfile=chk[0]
 creation=keyword_set(creation)
 access=keyword_set(access)
-utc=keyword_set(utc) || keyword_set(http)
 
 if access || creation then begin
  stc=file_info(dfile)
@@ -66,13 +62,9 @@ time=systim(0,dtime,utc=utc)
 
 ;-- convert to TAI
 
-case 1 of 
- keyword_set(tai)  : time=anytim2tai(time)
- keyword_set(http) : begin
-  day=utc2dow(time,/abb)
-  time=day+', '+str_replace(time,'-',' ')+' GMT'
- end
- else: nothing=1
-endcase
+if keyword_set(tai) then begin
+ ;time=systim(0,dtime,/utc)
+ time=anytim2tai(time)
+endif
 
 return,time & end
