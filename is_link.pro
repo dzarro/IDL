@@ -16,7 +16,7 @@
 ; Keywords    : DIRECTORY = limit check to directory
 ;               FILE = limit check to file
 ;
-; History     : 17 November 2025 Zarro (Consultant/Retired) 
+; History     : 17 November 2025 Zarro (Consultant/Retired) - written
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -32,7 +32,7 @@ info=file_info(item)
 
 case 1 of
  keyword_set(directory): chk=where(info.exists and info.directory and info.symlink and info.dangling_symlink,count)
- keyword_set(file): chk=where(info.exists and info.file and info.symlink and info.dangling_symlink,count)
+ keyword_set(file): chk=where(info.exists and info.regular and info.symlink and info.dangling_symlink,count)
  else:chk=where(info.exists and info.symlink and info.dangling_symlink,count)
 endcase
 
