@@ -574,7 +574,7 @@ if ~same_target then begin
    ;if tname eq self->snap_name() then continue
    if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
    ;tfile=concat_dir(target,tname)
-   if file_test(tfile,/reg) || self->is_link(tfile) then begin
+   if file_test(tfile,/reg) || is_link(tfile) then begin
     if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
    endif
   endfor 
@@ -878,7 +878,7 @@ windows=is_windows()
 for i=0,ocount-1 do begin
 
  old=local_name(dir[chk[i]])
- if self.keep_links && self->is_link(old,/dir) then continue
+ if self.keep_links && is_link(old,/dir) then continue
  
  ;if windows then check=0b else check=file_test(old,/dir,/sym)
  ;if check then begin
@@ -939,7 +939,7 @@ for i=0,ocount-1 do begin
  ;continue
  ;endif
  
- if self.keep_links && self->is_link(old,/file) then continue
+ if self.keep_links && is_link(old,/file) then continue
  
  file_delete2,old,err=err,/quiet  
  if is_blank(err) then self->log,'Deleting file: '+old,_extra=extra else begin
@@ -1523,7 +1523,7 @@ if ocount gt 0 then begin
  pecho=1b
  if pecho then begin
   for i=0,ocount-1 do begin
-   lchk=self->is_link(old[i])
+   lchk=is_link(old[i])
    if lchk then dtype=type+' (link)' else dtype=type
    self->log,'Non-matching target '+dtype+': '+old[i],_extra=extra
   endfor
@@ -1679,6 +1679,7 @@ for i=0,count-1 do begin
   alocal=ascii_decode(local)
   if alocal ne local then file_rename,local,alocal,err=err,_extra=extra
  endif
+
  if is_string(err) then self->log,err,_extra=extra,/error
 
 endfor
