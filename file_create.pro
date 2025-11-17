@@ -18,6 +18,7 @@
 
 pro file_create,file,err=err,verbose=verbose
 
+verbose=keyword_set(verbose)
 err=''
 verbose=keyword_set(verbose)
 if ~scalar_string(file,err=err) then begin
@@ -55,7 +56,7 @@ if ~file_test(lfile,/reg) then begin
  err='File not created: '+dfile
  mprint,err,_extra=exta
 endif else begin
- mprint,'File created: '+lfile,_extra=extra
+ if verbose then mprint,'File created: '+lfile,_extra=extra
 endelse
  
 return

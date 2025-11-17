@@ -128,7 +128,7 @@
 ;               13-Jan-2021, Zarro (ADNET)
 ;               - fixed bug with /PROGRESS not working for QUERY URL's
 ;               3-Mar-2022, Zarro (ADNET)
-;               - added /TEMP_DIR
+;               - added /TEMP_DIR/user/local/solarsoft/gen/idl/http/applets/gmtclock.dat
 ;               11-May-2022, Zarro (ADNET)
 ;               - added /NO_DIR_CHECK
 ;               11-Jul-2025, Zarro (Consultant/Retired)
@@ -205,8 +205,8 @@ if (error ne 0) then begin
  err=err_state()
  mprint,err,_extra=extra
  catch, /cancel
- message,/reset  
- return
+ message,/reset
+ goto,bail  
 endif
   
 stc=url_parse(url)
@@ -349,6 +349,8 @@ endif
 t_ofile=concat_dir(get_temp_dir(),file_basename(ofile)+'_'+session_id())
 t1=systime(/seconds)
 result = ourl->Get(file=t_ofile)  
+
+bail:
 
 ;-- check what happened
 

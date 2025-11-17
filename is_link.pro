@@ -31,9 +31,9 @@ if is_windows() then return,out
 info=file_info(item)
 
 case 1 of
- keyword_set(directory): chk=where(info.exists and info.directory and info.symlink and info.dangling_symlink,count)
- keyword_set(file): chk=where(info.exists and info.regular and info.symlink and info.dangling_symlink,count)
- else:chk=where(info.exists and info.symlink and info.dangling_symlink,count)
+ keyword_set(directory): chk=where(info.exists and info.directory and (info.symlink || info.dangling_symlink),count)
+ keyword_set(file): chk=where(info.exists and info.regular and (info.symlink || info.dangling_symlink),count)
+ else:chk=where(info.exists and (info.symlink || info.dangling_symlink),count)
 endcase
 
 if count gt 0 then out[chk]=1b

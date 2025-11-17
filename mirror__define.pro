@@ -60,7 +60,7 @@
 ;               GET_PATT = Regexp of source pathnames to retrieve
 ;               EXCLUDE_PATT = Regexp of source pathnames to exclude
 ;               LOCAL_IGNORE = Regexp of target pathnames to
-;               ignore. Useful to skip restricted target directories
+;               ignore. Useful to skip restricted target directories or files
 ;
 ; History     : 31-Dec-2018, Zarro (ADNET/GSFC) 
 ;                - first written during 2019 Gov't shutdown
@@ -100,6 +100,8 @@ self.file_cache=hash()
 self.dir_cache=hash()
 self.fhash=hash()
 self.dhash=hash()
+self.local_ignore=str_escape(self->snap_name())+'$'
+self.recurse=1b
 
 self->log,'Initializing mirror object',_extra=extra
 return,1                                                                                          
@@ -108,24 +110,27 @@ end
 ;-------------------------------------------------------------------------
 pro mirror::mirror,source,target,_extra=extra,err=err,run=run,$
                 directory_only=directory_only,append=append,$
-                recurse=recurse,log=log ;keep_links=keep_links,keep_directories=keep_directories
+                log=log
 
 err=''
 main=~stregex(get_caller(),'\:\:mirror',/fold,/bool) 
 if main then stime=anytim2tai(!stime)
 run=keyword_set(run)
 directory_only=keyword_set(directory_only)
-recurse=keyword_set(recurse)
+
 self->reset
 
 if isa(source,/string) && isa(target,/string) then begin
  self->set,source=source,target=target,err=err
- if is_string(err) then return
+ if is_string(err) then begin
+  return
+  ;self->log,err,_extra=extra,/error
+ endif
 endif 
 
 if isa(source,/string) && is_blank(target) then begin
- self->execute,source,_extra=extra,err=err,run=run,$
-                directory_only=directory_only,/recurse
+ self->execute,file_expand_path(source),_extra=extra,err=err,run=run,$
+                directory_only=directory_only
  log=self->get_log()
  return
 endif
@@ -140,6 +145,11 @@ struct_assign,self,pre_self
 self->set,_extra=extra,err=err
 if is_string(err) then begin
  self->log,err,_extra=extra,/error
+ return
+endif
+
+if is_blank(self.source) || is_blank(self.target) then begin
+ self->log,'Mirror source and target not set',_extra=extra,/error
  return
 endif
 
@@ -287,7 +297,7 @@ endif
 
 skip:
 
-if recurse then begin
+if self.recurse then begin
  ucount=self->ucount()
  if ucount gt 0 then begin
   udirs=self->ulist()
@@ -295,8 +305,9 @@ if recurse then begin
   sdirs=self.source+'/'+ubdirs
   tdirs=concat_dir(self.target,ubdirs)
   for i=0,ucount-1 do begin 
-   self->set,source=sdirs[i],target=tdirs[i]
-   self->mirror,run=run,recurse=recurse,_extra=extra,$
+   self->set,source=sdirs[i],target=tdirs[i],err=err
+   if is_string(err) then continue
+   self->mirror,run=run,recurse=self.recurse,_extra=extra,$
        directory_only=directory_only,/append 
   endfor
  endif
@@ -574,7 +585,7 @@ if ~same_target then begin
    ;if tname eq self->snap_name() then continue
    if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
    ;tfile=concat_dir(target,tname)
-   if file_test(tfile,/reg) || is_link(tfile) then begin
+   if ~file_test(tfile,/directory) then begin
     if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
    endif
   endfor 
@@ -609,11 +620,10 @@ dirs_requested=arg_present(dirs)
 files='' & dirs='' & fcount=0L & dcount=0L
 
 if is_blank(dir) then return
-if ~file_test(dir,/directory,_extra=extra) then return
+sdir=local_name(dir)
+if ~file_test(sdir,/directory,_extra=extra) then return
 
 ;if ~self->is_dir(dir,_extra=extra) then return
-
-sdir=local_name(dir)
 
 ;-- empty caches if requested 
 
@@ -878,7 +888,7 @@ windows=is_windows()
 for i=0,ocount-1 do begin
 
  old=local_name(dir[chk[i]])
- if self.keep_links && is_link(old,/dir) then continue
+ if self.keep_links && is_link(old) then continue
  
  ;if windows then check=0b else check=file_test(old,/dir,/sym)
  ;if check then begin
@@ -939,7 +949,7 @@ for i=0,ocount-1 do begin
  ;continue
  ;endif
  
- if self.keep_links && is_link(old,/file) then continue
+ if self.keep_links && is_link(old) then continue
  
  file_delete2,old,err=err,/quiet  
  if is_blank(err) then self->log,'Deleting file: '+old,_extra=extra else begin
@@ -1695,39 +1705,44 @@ pro mirror::set,target=target,source=source,do_directory=do_directory,$
                 err=err,local_ignore=local_ignore,$
                 get_patt=get_patt,no_deletes=no_deletes,force=force,no_snapshot=no_snapshot,$
                 keep_directories=keep_directories,update_log=update_log,keep_links=keep_links,$
-                exclude_patt=exclude_patt,new=new,old=old,diff=diff,ulist=ulist,slist=slist
+                exclude_patt=exclude_patt,new=new,old=old,diff=diff,ulist=ulist,slist=slist,recurse=recurse
           
 err=''
 if isa(source,/string) then begin
  if is_blank(source) then begin
-  err='Source cannot be blank.'
-  mprint,err
+  err='Source cannot be blank'
+  self->log,err,_extra=extra,/error
   return
  endif
  if self->is_url(source) then begin
   source=str_replace(source,'\','/')
-  chk=have_network(source,location=location,/full_path,err=err,interval=60.)
+  chk=have_network(source,location=location,/full_path,err=err,interval=3600.)
   ; sock_redirect,source,location,err=err,/verbose,/full_path
-  if is_string(err) || ~chk then return
+  if ~chk then begin
+   if is_blank(err) then err='Source unreachable'
+   self->log,err,_extra=extra,/error
+   self->log,'Check source value',_extra=extra,/error 
+   if is_string(err) || ~chk then return
+  endif
   if is_string(location) then self.source=location else self.source=source
   url=url_parse(self.source)
   self.url=url.scheme+'://'+url.host
  endif else begin
-  err='Source must be a valid URL.'
-  mprint,err
+  err='Source must be a valid URL'
+  self->log,err,_extra=extra,/error
   return
  endelse
 endif
 
 if isa(target,/string) then begin
  if is_blank(target) then begin
-  err='Target cannot be blank.'
-  mprint,err
+  err='Target cannot be blank'
+  self->log,err,_extra=extra,/error
   return
  endif
  if self->is_url(target) then begin
-  err='Target cannot be a URL.'
-  mprint,err
+  err='Target cannot be a URL'
+  self->log,err,_extra=extra,/error
   return
  endif
  self.target=local_name(target)
@@ -1745,13 +1760,23 @@ if isa(ulist,/string) then *self.ulist=ulist
 if isa(slist,/string) then *self.slist=slist
 
 if is_string(log,/blank) then *self.log=log
-if is_string(local_ignore,/blank) then self.local_ignore=local_ignore
+
+if is_string(local_ignore,/blank) then begin
+ case 1 of
+  is_blank(self.local_ignore) : self.local_ignore=local_ignore 
+  is_blank(local_ignore): do_nothing=1
+  ~stregex(self.local_ignore,local_ignore,/bool) : self.local_ignore=self.local_ignore+'|'+local_ignore
+  else: do_nothing=1
+ endcase
+endif
+
 if is_string(get_patt,/blank) then self.get_patt=get_patt
 if is_string(exclude_patt,/blank) then self.exclude_patt=exclude_patt
 
 if is_number(no_deletes) then self.no_deletes=no_deletes 
 if is_number(force) then self.force=force 
 
+if is_number(recurse) then self.recurse=recurse
 if is_number(keep_links) then self.keep_links=keep_links
 if is_number(no_snapshot) then self.no_snapshot=no_snapshot 
 if is_number(keep_directories) then self.keep_directories=keep_directories 
@@ -1762,11 +1787,13 @@ if is_string(update_log,/blank) then begin
   if (is_blank(odir) || odir eq '.') then odir=curdir()
   if ~file_test(odir,/directory) then begin
    err='Output directory for log file does not exist: '+odir
+   self->log,err,_extra=extra,/error
    self.update_log=''
    return
   endif
   if ~file_test(odir,/directory,/write) then begin
    err='Output directory for log file does not have write access: '+odir
+   self->log,err,_extra=extra,/error
    self.update_log=''
    return
   endif
@@ -2001,13 +2028,13 @@ endif
 
  get_patt=self->parse(pdata,'get_patt')
  local_ignore=self->parse(pdata,'local_ignore')
- sname=str_escape(self->snap_name())+'$'
- if is_string(local_ignore) then local_ignore=local_ignore+'|'+sname else local_ignore=sname 
+ ;sname=str_escape(self->snap_name())+'$'
+ ;if is_string(local_ignore) then local_ignore=local_ignore+'|'+sname else local_ignore=sname 
  
  update_log=self->parse(pdata,'update_log')
  self->set,source=source,target=target,err=err
  if is_string(err) then begin
-  self->log,err,_extra=extra,/error
+ ; self->log,err,_extra=extra,/error
   continue
  endif
 
@@ -2035,7 +2062,7 @@ end
 ;------------------------------------------------------------------
 pro mirror::help
 
-a="||Example uses:||;-- create map object instance||IDL> m=mirror()                ||;-- mirror SSW gen tree to user directory||;-- first define source and target directories||IDL> source='https://sohowww.nascom.nasa.gov/solarsoft/gen/idl'|IDL> target='~/solarsoft/gen/idl||;-- load them into mirror object||IDL> m->set,source=source,target=target||;-- compare top-level directories and files||IDL> m->mirror,/verb        ||;-- compare top- and sub-level directories and files recursively||IDL> m->mirror,/recurse,/verb||;-- run/execute mirror||IDL> m->mirror,/recurse,/run,/verb|"
+a="||Example uses:||;-- create mirror object instance||IDL> m=mirror()                ||;-- mirror SSW gen tree to user directory||;-- first define source and target directories||IDL> source='https://sohowww.nascom.nasa.gov/solarsoft/gen/idl'|IDL> target='~/solarsoft/gen/idl||;-- load them into mirror object||IDL> m->set,source=source,target=target||;-- compare top-level directories and files||IDL> m->mirror,/verb        ||;-- compare top- and sub-level directories and files recursively||IDL> m->mirror,/verb||;-- run/execute mirror||IDL> m->mirror,/run,/verb|"
 
 b=strsplit(a,'|',/extrac,/preserve)
 
@@ -2048,8 +2075,8 @@ return & end
 pro mirror__define                                                                                   
                                                                                                   
 void={mirror, $                                                                                       
-     source:'',$              ;-- source directory or URL to mirror from                                                                          
-     target:'',$              ;-- target directory to mirror to
+     source:'',$         ;-- source directory or URL to mirror from                     
+     target:'',$         ;-- target directory to mirror to
      do_directory:0b,$
      tdirs:ptr_new(), $
      sdirs:ptr_new(), $
@@ -2058,7 +2085,7 @@ void={mirror, $
      new:ptr_new(),$
      old:ptr_new(),$
      diff:ptr_new(),$ 
-	 ulist:ptr_new(),$
+     ulist:ptr_new(),$
      log:ptr_new(),$
      local_ignore:'',$
      get_patt:'',$
@@ -2066,16 +2093,17 @@ void={mirror, $
      no_deletes:0b,$
      force:0b,$
      no_snapshot:0b,$
-;	 snap_skip:0b,$
+;    snap_skip:0b,$
      keep_directories:0b,$
      keep_links:0b,$
      update_log:'',$
+     recurse:0b,$
      url:'',$
      file_cache:hash(),$
      dir_cache:hash(),$
-	 fhash:hash(),$
-	 dhash:hash(),$
-	 slist:ptr_new(),$
+     fhash:hash(),$
+     dhash:hash(),$
+     slist:ptr_new(),$
      inherits dotprop,inherits gen }
 
 return                                                                                            
