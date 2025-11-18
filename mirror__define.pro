@@ -570,6 +570,7 @@ endif
 
 ;-- find files changed on target
 
+
 dtfiles=''
 if ~same_target then begin
  dtarget=str_difference(snap_target,snap_target_sav,count=dtcount)
@@ -666,6 +667,7 @@ self.dir_cache[sdir]=empty_list
 self->log,caller+' calling FILE_SEARCH on '+sdir+'...',_extra=extra,1
 path=concat_dir(sdir,'*')
 listing=file_search(path,count=count,/fully_qualify,/expand_environment,/match_initial_dot,/nosort)
+
 if count eq 0 then return
 
 ;-- separate files and directories
@@ -819,6 +821,7 @@ pro mirror::snap_dir,dir,listing,_ref_extra=extra,count=count
 count=0 & listing='' 
 
 self->file_search,dir,files=files,fcount=count,_extra=extra
+
 ;self->list_files,dir,files,count=count,_extra=extra
 
 if count eq 0 then return
@@ -835,6 +838,7 @@ err=''
 info=file_info(files)
 sizes=info.size
 times=info.mtime
+
 listing=strcompress(files+'|'+string(times)+'|'+string(sizes),/remove_all)
 
 return & end
@@ -860,7 +864,8 @@ if is_blank(source) || is_blank(target) then return
 ;-- update latest source and target snapshots
 
 sfile=self->snap_file()
-file_delete,sfile,/allow_nonex,/quiet
+;file_delete,sfile,/allow_nonex,/quiet
+
 self->snap_url,source,snap_source_sav,err=err,_extra=extra,/cache
 if is_string(err) then return
 
@@ -872,6 +877,7 @@ if is_string(err) then return
 ;no_deletes_sav=self.no_deletes
 
 self->log,'Saving new snapshot to: '+sfile,_extra=extra
+
 save,file=sfile,snap_source_sav,snap_target_sav
 
 ;get_patt_sav,local_ignore_sav,no_deletes_sav

@@ -395,13 +395,13 @@ case 1 of
  ~chk.exists && (bsize eq 0l): begin
   status=1
   if verbose then mprint,'Remote file has zero byte size.',_extra=extra
-  file_create,t_ofile
+  file_create,t_ofile,verbose=verbose
  end
  ~chk.exists && (bsize gt 0): err='File not written to disk (check write access).'
  chk.exists && (tsize eq 0) && (bsize gt 0): err='Downloaded file has zero byte size (check disk space).'
  (bsize gt 0) && (tsize gt 0) && (tsize ne bsize): err='File failed to download completely (possible network timeout).'
  is_blank(result): err='Download interrupted (try again).'
- is_string(derr): err=derr
+ ;is_string(derr): err=derr
  else: status=1
 endcase
 
