@@ -44,7 +44,7 @@
 ;               IGNORE_DIRECTORIES = Regexp of source directories to not
 ;               mirror (target directories will be deleted unless
 ;               KEEP_DIRECTORIES is set)
-;               IGNORE_FILES = Regexp of source files to not mirror (target files will be deleted) 
+;               IGNORE_FILES = Regexp of source files to not mirror (target files will not be deleted) 
 ;               NO_SNAPSHOT = don't check last cache. Mirror will
 ;               save a snapshot of the last target and source files
 ;               for each directory it mirrors. It will check this
@@ -139,21 +139,27 @@ endif
 
 temp=obj_struct(self)
 if exist(extra) then extra=fix_extra(extra,temp)
-pre_self=temp
-struct_assign,self,pre_self
+;pre_self=temp
+;struct_assign,self,pre_self
 
 self->set,_extra=extra,err=err
 if is_string(err) then begin
- self->log,err,_extra=extra,/error
+ ;self->log,err,_extra=extra,/error
  return
 endif
 
 if is_blank(self.source) || is_blank(self.target) then begin
- self->log,'Mirror source and target not set',_extra=extra,/error
+ self->log,'Mirror source and target names not set',_extra=extra,/error
  return
 endif
 
-if main then self->log,['','Mirroring '+self.source+' => '+self.target],_extra=extra
+
+if main then begin
+ self->log,['','Mirroring '+self.source+' => '+self.target],_extra=extra,/verbose
+ if file_basename(self.source) ne file_basename(self.target) then begin
+  self->log,'Warning => root source and target names have different last directory names',_extra=extra,/verbose
+ endif
+endif
 
 if ~keyword_set(append) then self->set,log=''
 
@@ -193,12 +199,14 @@ endif else begin
 endelse 
 
 if is_string(err) then begin
- mprint,'Skipping: '+self.source
+ self->log,'Skipping: '+self.source,_extra=extra
  goto,skip
 endif
 
 no_changes=self->no_changes()
-if ~run && no_changes then self->log,'No directory changes',_extra=extra,1
+if ~run then begin
+ if no_changes then self->log,'No directory changes',_extra=extra,/verbose
+endif
 
 if run then begin
  odir=self.target
@@ -252,12 +260,12 @@ if ~directory_only then begin
  endelse 
 
  if is_string(err) then begin
-  mprint,'Skipping '+self.source
+  self->log,'Skipping '+self.source,_extra=extra
   goto,skip
  endif
  
  no_changes=self->no_changes()
- if ~run && no_changes then self->log,'No file changes',_extra=extra
+ if ~run && no_changes then self->log,'No file changes',_extra=extra,/verb
  
 ;-- process files
 
@@ -315,25 +323,27 @@ endif
 
 if main then begin
  if run then rmess='Mirror' else rmess='Search'
- self->log,['',rmess+' completed at: '+!stime],_extra=extra
+ self->log,['',rmess+' completed at: '+!stime],_extra=extra,/verbose
  etime=anytim2tai(!stime)
- self->log,'Elapsed time (secs) = '+trim2(str_format(etime-stime,'(f12.2)')),_extra=extra
+ self->log,'Elapsed time (secs) = '+trim2(str_format(etime-stime,'(f12.2)')),_extra=extra,/verbose
  if run then begin
   if is_string(self.update_log) then begin
    status=write_ascii(self.update_log,self->get_log())  ;,/update)
    self->log,'Wrote log file to: '+self.update_log,_extra=extra
   endif
- endif else print,'% Use /run to execute actual mirror'
+ endif else begin
+  self->log,'Use /run to execute actual mirror',_extra=extra,/verbose
+ endelse
 endif
 
 if arg_present(log) then log=self->get_log()
 
 ;-- restore original object state
 
-if main then begin
- pre_self=rem_tag(pre_self,['dhash','fhash'])
- struct_assign,pre_self,self,/nozero
-endif
+;if main then begin
+; pre_self=rem_tag(pre_self,['dhash','fhash'])
+;struct_assign,pre_self,self,/nozero
+;endif
  
 return
 end
@@ -368,7 +378,7 @@ update_hash,self->hash(_extra=extra),self.target,state,_extra=extra,err=err,/get
 
 if is_string(err) || ~is_struct(state) then begin
  if ~is_struct(state) then self->log,'No previous search results found',_extra=extra,/no_repeat
- if is_string(err) then self->log,err,_extra=extra,/error
+ if is_string(err) then self->log,err,_extra=extra,/verbose
  return
 endif
 
@@ -598,12 +608,14 @@ ocount=self->ocount()
 tfiles=[temporary(dsfiles),temporary(dtfiles)]
 dfiles=rem_blanks(get_uniq(tfiles),count=dcount)
 
-if (dcount gt 0) && (ncount gt 0) then dfiles=str_remove(dfiles,file_basename(self->new()),count=dcount)
-if (dcount gt 0) && (ocount gt 0) then dfiles=str_remove(dfiles,file_basename(self->old()),count=dcount)
+;if (dcount gt 0) && (ncount gt 0) then dfiles=str_remove(dfiles,file_basename(self->new()),count=dcount)
+;if (dcount gt 0) && (ocount gt 0) then dfiles=str_remove(dfiles,file_basename(self->old()),count=dcount)
 
 if dcount gt 0 then begin
+ if (ncount gt 0) then dfiles=str_remove(dfiles,file_basename(self->new()),count=dcount)
+ if (ocount gt 0) then dfiles=str_remove(dfiles,file_basename(self->old()),count=dcount)
  if dcount eq 1 then dfiles=dfiles[0]
- diff=source+'/'+dfiles
+ if dcount gt 0 then diff=source+'/'+dfiles
  self->log,['Source and target have different snapshots'],_extra=extra
 endif else self->log,['Source and target have identical snapshots'],_extra=extra
 
@@ -1463,7 +1475,7 @@ if ~self.do_directory then begin
     if is_blank(err) then begin
      self->set,diff=diff
      return
-    endif else self->log,'Problems with last with snapshot',_extra=extra,/error
+    endif else self->log,'Problems with last snapshot',_extra=extra,/error
    endif
    
 ;-- check all source/target file for differences
@@ -2081,7 +2093,7 @@ return & end
 pro mirror__define                                                                                   
                                                                                                   
 void={mirror, $                                                                                       
-     source:'',$         ;-- source directory or URL to mirror from                     
+     source:'',$         ;-- source URL to mirror from                     
      target:'',$         ;-- target directory to mirror to
      do_directory:0b,$
      tdirs:ptr_new(), $

@@ -281,7 +281,7 @@ if pre_check then begin
                 location=location,verbose=verbose,used_browser=used_browser)
  if ~chk then begin
   if is_blank(err) then err='URL unavailable.'
-  mprint,err,_extra
+  mprint,err,_extra=extra
   return
  endif		
  if is_string(location) then durl=location
@@ -351,6 +351,8 @@ t1=systime(/seconds)
 result = ourl->Get(file=t_ofile)  
 
 bail:
+
+if is_blank(t_ofile) then t_ofile=''
 
 ;-- check what happened
 
