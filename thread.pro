@@ -67,8 +67,8 @@ common thread,obridge_sav,ocontainer
     if n_elements(var_val) eq 0 then var_val=null()
    endif
    if var_input[0] ne '' then (scope_varfetch(var_input,level=out_level,/enter))=var_val
-   help,var_name,var_input[0],var_val,out_level
-   print,''
+  ; help,var_name,var_input[0],var_val,out_level
+  ; print,''
   endfor
  endif
 

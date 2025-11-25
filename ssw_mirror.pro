@@ -73,7 +73,9 @@ if strpos(target,'$SSW') gt -1 then begin
  m->mirror,_extra=extra,err=err,/recurse,run=run
 endif else m->mirror,target,_extra=extra,err=err,run=run
 
-if keyword_set(run) then obj_destroy,sav_m else begin
+if keyword_set(run) then begin
+ if obj_valid(sav_m) then obj_destroy,sav_m 
+endif else begin
  sav_m=obj_clone(m) & sav_target=otarget
 endelse
 

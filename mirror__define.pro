@@ -44,12 +44,12 @@
 ;               IGNORE_DIRECTORIES = Regexp of source directories to not
 ;               mirror (target directories will be deleted unless
 ;               KEEP_DIRECTORIES is set)
-;               IGNORE_FILES = Regexp of source files to not mirror (target files will not be deleted) 
+;               IGNORE_FILES = Regexp of source files to not mirror (target files will be deleted) 
 ;               NO_SNAPSHOT = don't check last cache. Mirror will
 ;               save a snapshot of the last target and source files
 ;               for each directory it mirrors. It will check this
 ;               cache to speed up mirroring next time. You can
-;               override this checking by setting /no_snapshot
+;               override this checking by setting /NO_SNAPSHOT
 ;               FORCE = force mirroring regardless of file size or
 ;               time. This will set /NO_SNAP_SHOT and essentially
 ;               re-mirror everything from scratch.
@@ -57,10 +57,10 @@
 ;               DETAILS = set for more detailed progress (1,2 for more detail)
 ;   
 ;               Legacy Perl/Mirror:
+;               LOCAL_IGNORE = Regexp of local files/directories to ignore (target files will not be updated/deleted)
 ;               GET_PATT = Regexp of source pathnames to retrieve
-;               EXCLUDE_PATT = Regexp of source pathnames to exclude
-;               LOCAL_IGNORE = Regexp of target pathnames to
-;               ignore. Useful to skip restricted target directories or files
+;               EXCLUDE_PATT = Regexp of remote files/directories to not mirror (existing target files/directories will
+;               deleted)
 ;
 ; History     : 31-Dec-2018, Zarro (ADNET/GSFC) 
 ;                - first written during 2019 Gov't shutdown
@@ -129,7 +129,7 @@ if isa(source,/string) && isa(target,/string) then begin
 endif 
 
 if isa(source,/string) && is_blank(target) then begin
- self->execute,file_expand_path(source),_extra=extra,err=err,run=run,$
+ self->execute,source,_extra=extra,err=err,run=run,$
                 directory_only=directory_only
  log=self->get_log()
  return
@@ -289,13 +289,15 @@ if ~directory_only then begin
 
 ;-- save new snapshot
 
-   self->snap_save,_extra=extra
+   ;self->snap_save,_extra=extra
    ;self.snap_skip=0b
+   
   endif
  endif
 
  if run then begin
  ; if ~self->snap_have() || self.snap_skip then self->snap_save,_extra=extra
+  self->snap_save,_extra=extra
   self->delete_state,_extra=extra
  endif
  
@@ -580,31 +582,38 @@ endif
 
 ;-- find files changed on target
 
-
+pattern='([^\|]+)|([^\|]+)|([^\|]+)'
 dtfiles=''
 if ~same_target then begin
  dtarget=str_difference(snap_target,snap_target_sav,count=dtcount)
- tignore=str_local(self.local_ignore)
+; tignore=str_local(self.local_ignore,/unix)
+
  if dtcount gt 0 then begin  
-  tlist=strsplit(dtarget,'|',/extract)  
-  for i=0,dtcount-1 do begin    
-   if dtcount eq 1 then tarr=tlist else tarr=tlist[i]
-   tsize=n_elements(tarr)
-   tfile=tarr[0]
-   if tfile eq '' then continue
-   tname=file_basename(tfile)
-   ;if tname eq self->snap_name() then continue
-   if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
+  xlist=stregex(dtarget,pattern,/ext,/sub)
+  xfiles=file_basename(xlist[1,*])
+  chk=where(stregex(xfiles,self.local_ignore,/bool),scount,complement=dcomplement,ncomp=dtcount)
+  if dtcount gt 0 then dtfiles=xfiles[dcomplement] else dtfiles=''
+ 
+  ;tlist=strsplit(dtarget,'|',/extract)  
+  ;for i=0,dtcount-1 do begin    
+  ;if dtcount eq 1 then tarr=tlist else tarr=tlist[i]
+  ;tsize=n_elements(tarr)
+  ;tfile=tarr[0]
+  ;if tfile eq '' then continue
+  ;tname=file_basename(tfile)
+  ;if tname eq self->snap_name() then continue
+  ;if is_string(tignore) then if stregex(tname,tignore,/bool) then continue
    ;tfile=concat_dir(target,tname)
-   if ~file_test(tfile,/directory) then begin
-    if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
-   endif
-  endfor 
+   ;if ~file_test(tfile,/directory) then begin
+   ;if dtfiles[0] eq '' then dtfiles=tname else dtfiles=[temporary(dtfiles),tname]
+   ;endif
+  ;endfor 
  endif
 endif
 
 ncount=self->ncount()
 ocount=self->ocount()
+
 tfiles=[temporary(dsfiles),temporary(dtfiles)]
 dfiles=rem_blanks(get_uniq(tfiles),count=dcount)
 
@@ -1036,7 +1045,7 @@ self->set,tdirs='',tfiles='',sdirs='',sfiles=''
 ;-- skip target directory if ignoring
 
 if is_string(self.local_ignore) then begin
- tignore=str_local(self.local_ignore)
+ tignore=str_local(self.local_ignore,/unix)
  if stregex(self.target,tignore,/bool) then begin
   if ~self.do_directory then begin
    self->log,'Ignoring: '+self.target,_extra=extra
@@ -1115,7 +1124,7 @@ return & end
 ;-----------------------------------------------------------------------------------
 ;-- filter directories & files
 
-pro mirror::filter,_ref_extra=extra,err=err,ignore_directories=ignore_directories,ignore_files=ignore_files
+pro mirror::filter,_ref_extra=extra,err=err  ;ignore_directories=ignore_directories,ignore_files=ignore_files
 
 err=''
 direct=self.do_directory
@@ -1149,7 +1158,7 @@ if is_string(self.get_patt) then begin
  
  tcount=self->tcount()
  if tcount gt 0 then begin
-  get_patt=str_local(self.get_patt)
+  get_patt=str_local(self.get_patt,/unix)
   ttemp=self->target()
   if direct then tnames=ttemp else tnames=file_basename(ttemp)
   reject=str_remove(tnames,get_patt,/regex,rcount=rcount,rindex=rindex)
@@ -1198,6 +1207,8 @@ if is_string(self.local_ignore) then begin
   if direct then self->set,tdirs=ttemp else self->set,tfiles=ttemp
  endif
 endif
+
+return
 
 ;-- remove excluded patterns (legacy PERL/Mirror)
 
@@ -1780,10 +1791,11 @@ if isa(slist,/string) then *self.slist=slist
 if is_string(log,/blank) then *self.log=log
 
 if is_string(local_ignore,/blank) then begin
+ eignore=str_escape(local_ignore)
  case 1 of
-  is_blank(self.local_ignore) : self.local_ignore=local_ignore 
+  is_blank(self.local_ignore) : self.local_ignore=eignore 
   is_blank(local_ignore): do_nothing=1
-  ~stregex(self.local_ignore,local_ignore,/bool) : self.local_ignore=self.local_ignore+'|'+local_ignore
+  ~stregex(self.local_ignore,eignore,/bool) : self.local_ignore=self.local_ignore+'|'+eignore
   else: do_nothing=1
  endcase
 endif
@@ -1893,7 +1905,6 @@ if is_blank(file) then begin
  return
 endif
 
-file=fcomplete(file)
 if ~file_test(file,/reg) then begin
  err='Package file not found: '+file
  return
@@ -1949,7 +1960,7 @@ end
 
 pro mirror::thread,package,_ref_extra=extra
 
-thread,'self->mirror',package,_extra=extra
+thread,'self->mirror',file_expand_path(package),_extra=extra
 
 return
 end
@@ -2046,6 +2057,7 @@ endif
 
  get_patt=self->parse(pdata,'get_patt')
  local_ignore=self->parse(pdata,'local_ignore')
+ 
  ;sname=str_escape(self->snap_name())+'$'
  ;if is_string(local_ignore) then local_ignore=local_ignore+'|'+sname else local_ignore=sname 
  
