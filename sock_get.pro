@@ -241,11 +241,11 @@ if ~keyword_set(no_dir_check) then begin
   mprint,err,_extra=extra
   return
  endif
- if ~file_test(odir,/write) then begin
-  err='No write access to directory - '+odir
-  mprint,err,_extra=extra
-  return
- endif
+ ;if ~file_test(odir,/write) then begin
+ ; err='No write access to directory - '+odir
+ ; mprint,err,_extra=extra
+ ; return
+ ;endif
 endif
 
 ;-- check write access to output file
@@ -253,11 +253,11 @@ endif
 ofile=concat_dir(odir,ofile)
 oinfo=file_info(ofile)
 have_file=oinfo.exists
-if have_file && ~file_test(ofile,/write) then begin
- err='No write access to file - '+ofile
- mprint,err,_extra=extra
- return
-endif
+;if have_file && ~file_test(ofile,/write) then begin
+; err='No write access to file - '+ofile
+; mprint,err,_extra=extra
+; return
+;endif
  
 if verbose then mprint,'Downloading to: '+ofile,_extra=extra
 osize=0l & otime=0.
@@ -433,8 +433,8 @@ endif
 
 ;file_move,t_ofile,ofile,/overwrite,/allow_same,/noexpand_path
 
-file_copy,t_ofile,ofile,/force,/allow_same,/overwrite,_extra=extra
-file_delete,t_ofile,/allow_nonexistent,_extra=extra
+file_copy,t_ofile,ofile,/force,/allow_same,/overwrite,_extra=extra,/noexpand_path
+file_delete2,t_ofile,/allow_nonexistent,_extra=extra,/noexpand_path
 chmod,ofile,/g_read,/g_write,/u_read,/u_write,/noexpand_path,/a_execute,_extra=extra
 local_file=ofile
 

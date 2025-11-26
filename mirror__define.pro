@@ -116,6 +116,8 @@ err=''
 main=~stregex(get_caller(),'\:\:mirror',/fold,/bool) 
 if main then stime=anytim2tai(!stime)
 run=keyword_set(run)
+if ~run then self.err_flag=0b
+
 directory_only=keyword_set(directory_only)
 
 self->reset
@@ -211,12 +213,11 @@ endif
 if run then begin
  odir=self.target
  if ~file_test(odir,/direc) then begin
-  self->log,'Creating target directory - '+odir,_extra=extra
-  mk_dir,odir,err=err
-  if is_string(err) then begin
+  mk_dir,odir,err=err,/disable
+  if is_blank(err) then self->log,'Created target directory - '+odir,_extra=extra else begin
    self->log,log,err,_extra=extra,/error
    goto,skip
-  endif
+  endelse
  endif
 endif
 
@@ -295,9 +296,10 @@ if ~directory_only then begin
   endif
  endif
 
+ ;help,self.err_flag
  if run then begin
  ; if ~self->snap_have() || self.snap_skip then self->snap_save,_extra=extra
-  self->snap_save,_extra=extra
+  if ~self.err_flag then self->snap_save,_extra=extra
   self->delete_state,_extra=extra
  endif
  
@@ -913,7 +915,7 @@ chk=where(dir ne '',ocount)
 if (ocount eq 0) then return
 windows=is_windows()
 for i=0,ocount-1 do begin
-
+ err=''
  old=local_name(dir[chk[i]])
  if self.keep_links && is_link(old) then continue
  
@@ -923,12 +925,12 @@ for i=0,ocount-1 do begin
  ;continue 
  ;endif
  
- file_delete2,old,/recursive,err=err,/quiet
- if is_string(err) then begin
+ file_delete2,old,/recursive,err=err,/disable
+ if is_blank(err) then self->log,'Deleted directory: '+old,_extra=extra else $
   self->log,err,_extra=extra,/error
-  err='Unable to delete directory: '+old
-  self->log,err,_extra=extra,/error
- endif else self->log,'Deleting directory: '+old,_extra=extra
+;  err='Unable to delete directory: '+old
+;  self->log,err,_extra=extra,/error
+
 endfor
 
 return & end
@@ -944,18 +946,18 @@ odir=local_name(self.target)
 
 ;-- verify write access to target
 
-if ~file_test(odir,/write) then begin
- err='Denied write access to directory: '+odir
- self->log,err,_extra=extra,/error
- return
-endif
+;if ~file_test(odir,/write) then begin
+;err='Denied write access to directory: '+odir
+;self->log,err,_extra=extra,/error
+;return
+;endif
 
 for i=0,ncount-1 do begin
  new=local_name(dir[chk[i]])
  err=''
- self->log,'Creating directory: '+new,_extra=extra
- mk_dir,new,err=err
- if is_string(err) then self->log,err,_extra=extra,/error
+ mk_dir,new,err=err,_extra=extra,/disable
+ if is_blank(err) then self->log,'Created directory: '+new,_extra=extra else $
+  self->log,err,_extra=extra,/error
 endfor
 
 return & end
@@ -969,6 +971,7 @@ chk=where(file ne '',ocount)
 if (ocount eq 0) then return
 for i=0,ocount-1 do begin
  old=local_name(file[chk[i]])
+ err=''
  
  ;if ~file_test(old,/regular,/noexpand_path) then begin
  ; err='Missing file: '+old
@@ -978,11 +981,12 @@ for i=0,ocount-1 do begin
  
  if self.keep_links && is_link(old) then continue
  
- file_delete2,old,err=err,/quiet  
- if is_blank(err) then self->log,'Deleting file: '+old,_extra=extra else begin
+ file_delete2,old,err=err,/disable  
+ if is_blank(err) then self->log,'Deleted file: '+old,_extra=extra else begin
   self->log,err,_extra=extra,/error
-  err='Unable to delete file: '+old
-  self->log,err,_extra=extra,/error
+ ; err='Unable to delete file: '+old
+ ; self->log,err,_extra=extra,/error
+  self.err_flag=1b
  endelse
 endfor
  
@@ -1208,8 +1212,6 @@ if is_string(self.local_ignore) then begin
  endif
 endif
 
-return
-
 ;-- remove excluded patterns (legacy PERL/Mirror)
 
 new_mirror=is_string(ignore_directories) || is_string(ignore_files)
@@ -1226,7 +1228,7 @@ if direct then begin
   snames=self->strip_url(sdirs)
   out=str_remove(snames,excl,_extra=extra,/regex,count=count,index=index)
   if count gt 0 then begin
-   if count le self->scount() then sdirs=sdirs[index]
+   if count lt self->scount() then sdirs=sdirs[index]
   endif else sdirs=''
   self->set,sdirs=sdirs
  endif
@@ -1242,7 +1244,7 @@ if ~direct then begin
   snames=file_basename(sfiles)
   out=str_remove(snames,excl,_extra=extra,/regex,count=count,index=index)
   if count gt 0 then begin
-   if count le self->scount() then sfiles=sfiles[index]
+   if count lt self->scount() then sfiles=sfiles[index]
   endif else sfiles=''
   self->set,sfiles=sfiles
  endif
@@ -1254,9 +1256,9 @@ return & end
 function mirror::strip_url,names
 
 if ~isa(names,/string) then return,''
-if ~self->is_url(self.source) || is_blank(self.url) then return,names
+if ~self->is_url(self.source) || is_blank(self.site) then return,names
 
-len=strlen(self.url)
+len=strlen(self.site)
 slens=max(strlen(names))
 snames=strmid(names,len,slens)
 return,snames
@@ -1588,7 +1590,7 @@ endif
 return & end
 
 ;--------------------------------------------------------------------------
-;-- check if file or directory is a link (regular or dangling)
+;-- check if file or directory is a link (sym or dangling)
 
 function mirror::is_link,item,_ref_extra=extra,file=file,directory=directory
 
@@ -1667,14 +1669,15 @@ if count eq 0 then return
 
 odir=self.target
 
-if ~file_test(odir,/write) then begin
- err='Denied write access to directory: '+odir
- self->log,err,_extra=extra,/err
- return
-endif
+;if ~file_test(odir,/write) then begin
+;err='No write access to directory: '+odir
+;self->log,err,_extra=extra,/err
+;return
+;endif
 
 for i=0,count-1 do begin
  sfile=file[chk[i]]
+ 
  ;item=concat_dir(odir,file_basename(sfile))
  item=file_basename(sfile)
  ;current=file_test(item,/regular)
@@ -1696,15 +1699,15 @@ for i=0,count-1 do begin
  
 ;-- catch unanticipated errors
 
- error=0
- catch,error
- if (error ne 0) then begin
-  err=err_state()
-  catch, /cancel
-  message,/reset
-  self->log,err,_extra=extra,/error
-  continue
- endif
+ ;error=0
+ ;catch,error
+ ;if (error ne 0) then begin
+ ;err=err_state()
+ ;catch, /cancel
+ ;message,/reset
+ ;self->log,err,_extra=extra,/error
+ ;continue
+ ;endif
 
  rfile=self->encode(sfile)
  sock_get,rfile,out=odir,local=local,no_check=self.force,/disable,err=err,_extra=extra,/no_dir_check,status=status
@@ -1716,11 +1719,13 @@ for i=0,count-1 do begin
  self->log,mout,_extra=extra
  if is_blank(err) then begin
   alocal=ascii_decode(local)
-  if alocal ne local then file_rename,local,alocal,err=err,_extra=extra
+  if alocal ne local then file_rename,local,alocal,err=err,_extra=extra,/disable
  endif
 
- if is_string(err) then self->log,err,_extra=extra,/error
-
+ if is_string(err) then begin
+  self->log,err,_extra=extra,/error
+  self.err_flag=1b
+ endif
 endfor
 
 return
@@ -1755,7 +1760,7 @@ if isa(source,/string) then begin
   endif
   if is_string(location) then self.source=location else self.source=source
   url=url_parse(self.source)
-  self.url=url.scheme+'://'+url.host
+  self.site=url.scheme+'://'+url.host
  endif else begin
   err='Source must be a valid URL'
   self->log,err,_extra=extra,/error
@@ -2123,12 +2128,13 @@ void={mirror, $
      no_deletes:0b,$
      force:0b,$
      no_snapshot:0b,$
+     err_flag:0b,$
 ;    snap_skip:0b,$
      keep_directories:0b,$
      keep_links:0b,$
      update_log:'',$
      recurse:0b,$
-     url:'',$
+     site:'',$
      file_cache:hash(),$
      dir_cache:hash(),$
      fhash:hash(),$
