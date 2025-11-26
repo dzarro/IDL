@@ -32,12 +32,13 @@
 ;                1-Apr-2019, Zarro (ADNET) - made modification the default
 ;               16-Nov-2019, Zarro (ADNET) - added call to WIN_TOUCH
 ;               16-Nov-2025, Zarro (Consultant/Retired) - added support for environment variables in file name
+;               26-Nov-2025, Zarro (Consultant/Retired) - added call to CHMOD
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
 
 pro file_touch,file,time,access=access, modification=modification,$
-               err=err,_ref_extra=extra,output=output,no_daylight_savings=no_daylight_savings
+               err=err,_extra=extra,output=output,no_daylight_savings=no_daylight_savings
 
 
 err=''
@@ -87,8 +88,9 @@ flag='-m'
 if keyword_set(access) then flag='-a'
 if ~windows then flag='-f '+flag
 
+ofile=dfile
 if ~windows then begin 
- if ~stregex(dfile,'^"',/bool) || stregex(dfile,'$"',/bool) then dfile='"'+dfile+'"'
+ if ~stregex(dfile,'^"',/bool) || stregex(dfile,'"$',/bool) then dfile='"'+dfile+'"'
 endif
 
 if valid_time(time) then begin
@@ -112,14 +114,17 @@ endif
 
 dst=~keyword_set(no_daylight_savings)
 if windows && dst then begin 
- ntime=anytim(file_time(dfile))
+ ntime=anytim(file_time(ofile))
  if valid_time(time) then tref=anytim(time) else tref=anytim(file_time(time))
  diff=float(nint(ntime-tref))
  if diff ne 0. then begin
   dprint,'%diff ',diff
   ctime=anytim(ntime-2*diff,/vms)
-  file_touch,dfile,ctime,access_only=access_only, modification_only=modification_only,$
+  file_touch,ofile,ctime,access_only=access_only, modification_only=modification_only,$
    output=output,_extra=extra,/no_daylight_savings,err=err
  endif
 endif
+
+if is_struct(extra) then chmod,ofile,_extra=extra,err=err
+
 return & end

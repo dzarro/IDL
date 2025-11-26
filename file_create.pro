@@ -14,11 +14,11 @@
 ; Keywords    : ERR = error string
 ;
 ; History     : 26 January 2019, Zarro (ADNET) - written
+;               26-Nov-2025, Zarro (Consultant/Retired) - added call to CHMOD
 ;-
 
-pro file_create,file,err=err,verbose=verbose
+pro file_create,file,err=err,verbose=verbose,_extra=extra
 
-verbose=keyword_set(verbose)
 err=''
 verbose=keyword_set(verbose)
 if ~scalar_string(file,err=err) then begin
@@ -54,10 +54,12 @@ close_lun,lun
 
 if ~file_test(lfile,/reg) then begin
  err='File not created: '+dfile
- mprint,err,_extra=exta
+ mprint,err,_extra=extra
 endif else begin
  if verbose then mprint,'File created: '+lfile,_extra=extra
 endelse
- 
+
+if is_struct(extra) then chmod,lfile,_extra=extra,err=err
+
 return
 end
