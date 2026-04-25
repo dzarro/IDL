@@ -28,6 +28,8 @@
 ;               3-Feb-2022, Zarro (ADNET)
 ;                - fixed potential bug with /RECOVER
 ;                - added ERR
+;               23-Apr-2026, Zarro (Retired)
+;                - returned corrected COUNT when duplicate files are returned
 ;
 ; Contact     : DZARRO@SOLAR.STANFORD.EDU
 ;-
@@ -95,6 +97,7 @@ count=n_elements(records)
 if count gt 1 then begin
  fids=get_uniq(records.fileid,sorder)
  records=records[sorder]
+ count=n_elements(records)
 endif
 
 urls=records.url

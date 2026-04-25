@@ -1488,7 +1488,10 @@ if ~self.do_directory then begin
     if is_blank(err) then begin
      self->set,diff=diff
      return
-    endif else self->log,'Problems with last snapshot',_extra=extra,/error
+    endif else begin
+	 self->log,'Problems with last snapshot',_extra=extra,/error
+	 self,log,err,_extra=extra,/error
+	endelse
    endif
    
 ;-- check all source/target file for differences
@@ -1501,7 +1504,8 @@ if ~self.do_directory then begin
     if ccount eq 0 then continue
     ssize=self->file(sout[i],time=stime,err=err,_extra=extra)
     if is_string(err) then continue
-    tsize=self->file(tout[k],time=ttime,_extra=extra)
+    tsize=self->file(tout[k],time=ttime,err=err,_extra=extra)
+	if is_string(err) then continue
     ssame=(tsize eq ssize)
     tdiff=abs((ttime-stime))
     tsame=tdiff eq 0.
