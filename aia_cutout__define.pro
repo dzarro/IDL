@@ -72,7 +72,8 @@ function aia_cutout::search,tstart,tend,count=count,times=times,err=err,_ref_ext
   ; use inherited site search to find directories within tstart to tend
   ; expanded by 2 hours in each direction
 
-  urls = self->site::search(tstart,tend,inst='aia',window=7200.,count=nurls,_extra=extra,err=serr,/quiet)
+  window=7200.
+  urls = self->site::search(tstart,tend,inst='aia',count=nurls,_extra=extra,err=serr,/quiet)
   
  ;-- DMZ commented the following lines as SITE::SEARCH modifies TSTART/TEND with the window modified values
  

@@ -256,9 +256,10 @@ endelse
 
 methods=['level0','level1','vso','cat']
 case 1 of
- cat: method=methods[3]
+ flevel eq 0: method=methods[0]
  flevel eq 1: method=methods[1] 
  vso: method=methods[2]
+ cat: method=methods[3]
  else: method=methods[2]
 endcase
 
