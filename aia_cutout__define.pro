@@ -85,7 +85,8 @@ function aia_cutout::search,tstart,tend,count=count,times=times,err=err,_ref_ext
   if nurls gt 0 then begin
     dir_times = self->dir2time(dir=urls)
     if n_elements(dir_times) eq 2 then dir_times = reform(dir_times,2,1)
-    q = where( dir_times[1,*] gt tstart and dir_times[0,*] lt tend, count)
+    q = where( dir_times[1,*] ge tstart and dir_times[0,*] le tend, count)
+	
     if count gt 0 then begin
       nurls = count
       urls = urls[q]

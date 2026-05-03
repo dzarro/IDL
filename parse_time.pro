@@ -44,7 +44,6 @@ function parse_time,file,delim=delim,err=err,count=count,ss=ss,ymd=ymd,$
                     separator=separator,tai=tai,vms=vms,truncate=truncate,$
                     extension=extension,regex=regex,names=names,_extra=extra,$
                     utc=utc,short=short,msecs=msecs
-
 if n_elements(file) gt 1 then $
  dprint,'% '+get_caller()+' calling PARSE_TIME: ',trim(n_elements(file))
 
