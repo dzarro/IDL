@@ -31,18 +31,20 @@
 ;               19-Mar-2019, Zarro (ADNET) - add DIRECTORY support
 ;                1-Apr-2019, Zarro (ADNET) - made modification the default
 ;               16-Nov-2019, Zarro (ADNET) - added call to WIN_TOUCH
-;               16-Nov-2025, Zarro (Consultant/Retired) - added support for environment variables in file name
-;               26-Nov-2025, Zarro (Consultant/Retired) - added call to CHMOD
+;               16-Nov-2025, Zarro (Retired) - added support for environment variables in file name
+;               26-Nov-2025, Zarro (Retired) - added call to CHMOD
+;                5-May-2026, Zarro (Retired) - added check for SSW version of WIN_TOUCH 
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
 
 pro file_touch,file,time,access=access, modification=modification,$
-               err=err,_extra=extra,output=output,no_daylight_savings=no_daylight_savings
+               err=err,_extra=extra,output=output,no_daylight_savings=no_daylight_savings,verbose=verbose
 
 
 err=''
-cmd='touch'
+cmd='touch' 
+output=''
 windows=os_family(/lower) eq 'windows'
 
 if is_blank(time) then time=!stime
@@ -65,16 +67,6 @@ if info.directory then begin
  return
 endif
 
-if windows then begin
-; cmd=local_name('$SSW/gen/exe/windows/touch.exe')
- cmd=win_touch()
- chk=file_search(cmd,count=count)
- if count eq 0 then begin
-  err='Windows Touch executable not found.' 
-  mprint,err,_extra=extra & return
- endif
-endif
-
 if ~valid_time(time) then begin
  ftime=local_name(time)
  info=file_info(ftime)
@@ -83,6 +75,35 @@ if ~valid_time(time) then begin
   mprint,err,_extra=extra & return
  endif
 endif
+
+error=0
+catch, error
+if (error ne 0) then begin
+ catch, /cancel
+ err=err_state()
+ mprint,err
+ message,/reset
+ return
+endif
+
+;-- check all possible Windows TOUCH executable locations
+
+if windows then begin
+ repeat begin
+  cmd=local_name('$SSW/gen/exe/windows/touch.exe')
+  if file_test(cmd,/reg) then break
+  cmd=concat_dir(get_temp_dir(),'touch.exe')
+  if file_test(cmd,/reg) then break
+  sock_get,ssw_server()+'/solarsoft/gen/exe/windows/touch.exe',out_dir=get_temp_dir(),local=cmd
+  if file_test(cmd,/reg) then break
+  cmd=win_touch()
+  if file_test(cmd,/reg) then break
+  err='Windows Touch executable not found.' 
+  mprint,err,_extra=extra & return
+ endrep until 1b
+endif
+
+if keyword_set(verbose) then mprint,cmd,_extra=extra
 
 flag='-m'
 if keyword_set(access) then flag='-a'
@@ -118,6 +139,7 @@ if windows && dst then begin
  if valid_time(time) then tref=anytim(time) else tref=anytim(file_time(time))
  diff=float(nint(ntime-tref))
  if diff ne 0. then begin
+  mprint,'Applying daylight saving correction.',_extra=extra
   dprint,'%diff ',diff
   ctime=anytim(ntime-2*diff,/vms)
   file_touch,ofile,ctime,access_only=access_only, modification_only=modification_only,$

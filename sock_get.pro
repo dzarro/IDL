@@ -131,9 +131,9 @@
 ;               - added /TEMP_DIR/user/local/solarsoft/gen/idl/http/applets/gmtclock.dat
 ;               11-May-2022, Zarro (ADNET)
 ;               - added /NO_DIR_CHECK
-;               11-Jul-2025, Zarro (Consultant/Retired)
+;               11-Jul-2025, Zarro (Retired)
 ;               - added check for gzip encoded remote file
-;               11-Nov-2025, Zarro (Consultant/Retired)
+;               11-Nov-2025, Zarro (Retired)
 ;                - added KEEP_NEWER
 ;
 ; Contact     : dzarro@solar.stanford.edu

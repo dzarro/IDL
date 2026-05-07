@@ -34,6 +34,7 @@ if is_blank(file) then begin
  return,null()
 endif
 
+file=strtrim(file,2)
 if ~file_test(file,/read,/regular) then begin
  err='Input file not found - '+file
  mprint,err
