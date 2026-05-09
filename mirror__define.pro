@@ -899,7 +899,7 @@ if is_string(err) then return
 ;local_ignore_sav=self.local_ignore
 ;no_deletes_sav=self.no_deletes
 
-self->log,'Saving new snapshot to: '+sfile,_extra=extra
+self->log,'Saving new snapshot to: '+sfile,_extra=extra,1
 
 save,file=sfile,snap_source_sav,snap_target_sav
 
