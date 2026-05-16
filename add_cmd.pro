@@ -26,11 +26,11 @@ if count gt 0 then begin
 endif
 
 if verbose then mprint,'Reading from '+sfile,/cont
-temp=strtrim(rd_ascii(sfile))
+temp=strtrim(rd_ascii(sfile),1)
 
 ;-- find first occurrence of pro or function call
 
-chk=where(stregex(temp, '^(pro +|function +)',/bool),count)
+chk=where(stregex(temp, '^(pro +|function +)',/bool,/fold),count)
 if count eq 0 then begin
  err='Input program not a valid procedure or function.'
  mprint,err

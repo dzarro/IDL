@@ -243,21 +243,21 @@ end
 
 ;--------------------------------------------------------------------------
 
-function trace::search,tstart,tend,_ref_extra=extra,vso=vso,flevel=flevel,cat=cat
+function trace::search,tstart,tend,_ref_extra=extra,vso=vso,level=level,cat=cat
   
 vso=keyword_set(vso)
 cat=keyword_set(cat)  
-if is_number(flevel) then flevel= (0 > fix(flevel) < 1) else begin
+if is_number(level) then level= (0 > fix(level) < 1) else begin
  vso=1
- flevel=-1
+ level=-1
 endelse
 
 ;-- def search for VSO files
 
 methods=['level0','level1','vso','cat']
 case 1 of
- flevel eq 0: method=methods[0]
- flevel eq 1: method=methods[1] 
+ level eq 0: method=methods[0]
+ level eq 1: method=methods[1] 
  vso: method=methods[2]
  cat: method=methods[3]
  else: method=methods[2]
@@ -269,23 +269,40 @@ return,files
 end
 
 ;-------------------------------------------------------------------------
-;-- LMSAL search wrapper
+;-- LEVEL 1 search wrapper
 
-function trace::level1,tstart,tend,_ref_extra=extra,wave=wave,count=count,type=type,verbose=verbose,err=err
+function trace::level1,tstart,tend,_ref_extra=extra,wavelength=wavelength,count=count,type=type,verbose=verbose,err=err,nearest=nearest
 verbose=keyword_set(verbose)
-if verbose then mprint,'Searching for Leve1 1 files...'
+nearest=keyword_set(nearest)
+end_time=valid_time(tend)
 
 self->valid_times,tstart,tend,err=err
 if is_string(err) then return,''
 
-server=trace_server(_extra=extra,path=path,flevel=1)
+server=trace_server(_extra=extra,path=path,level=1,verbose=verbose,err=err)
+if is_string(err) then return,''
+if verbose then mprint,'Searching '+server+' for Leve1 1 files...'
+
 s=obj_new('site')
 s->setprop,rhost=server,topdir=path,/full,ext='fts',delim='/'
-if keyword_set(wave) then s->setprop,ftype='.'+trim(wave)
+if is_number(wavelength) || is_string(wavelength) then s->setprop,ftype='.'+trim(wavelength)
 files=s->search(tstart,tend,_extra=extra,count=count)
 obj_destroy,s
 
+if (nearest || ~valid_time(end_time)) && (count gt 1) then begin
+ times=parse_time(files,/tai)
+ diff=abs(times-anytim2tai(tstart))
+ chk=where(diff eq min(diff),count)
+ files=files[chk[0]]
+endif
+
+if count eq 0 then begin
+ mprint,'No matching files found.'
+ files=''
+endif
+
 type=self->ftype(count)
+
 return,files
 end
 
@@ -448,7 +465,7 @@ endelse
    
 return & end
 ;-------------------------------------------------------------------------
-;-- find  Level 0 files
+;-- Level 0 search wrapper
 
 function trace::level0,tstart,tend,_ref_extra=extra,verbose=verbose,count=count,$
                        times=times,type=type,err=err,nearest=nearest
@@ -456,16 +473,20 @@ function trace::level0,tstart,tend,_ref_extra=extra,verbose=verbose,count=count,
 err=''
 verbose=keyword_set(verbose)
 nearest=keyword_set(nearest)
-if verbose then mprint,'Searching remote archive for Level 0 files...'
+
 return_times=arg_present(times)
+end_time=valid_time(tend)
 times=-1
 count=0l
 type=''
+
 self->valid_times,tstart,tend,err=err
 if is_string(err) then return,''
 
-server=trace_server(flevel=0,path=path,err=err,verbose=verbose)
+server=trace_server(level=0,path=path,err=err,verbose=verbose,_extra=extra)
 if is_string(err) then return,''
+
+if verbose then mprint,'Searching '+server+' for Level 0 files...'
 path=server+path
 tstart=anytim2tai(tstart) & tend=anytim2tai(tend)
 
@@ -491,19 +512,16 @@ endif
 sfiles=path+'/'+week_id+'/tri'+time_id
 files=str_same(sfiles,tfiles,count=count)
 
+if (nearest || ~valid_time(end_time)) && (count gt 1) then begin
+ nfile=self->nearest(files,tstart,count=count,err=err,_extra=extra)  
+ if count gt 0 then files=nfile
+endif
+ 
 if count eq 0 then begin
  mprint,'No matching files found.'
- return,''
+ files=''
 endif
-
-if nearest then begin
- nfile=self->nearest(files,tstart,count=count,err=err,_extra=extra)  
- if count eq 0 then begin
-  mprint,'No matching files found.'
-  return,''
- endif else files=nfile
-endif
-
+ 
 type=self->ftype(count)
 if return_times then times=self->ftimes(files,delim='.')  
 return,files
@@ -539,7 +557,7 @@ otimes=anytim2tai(index.date_obs) & itime=anytim2tai(tstart)
 oimage=indgen(n_elements(otimes))
 
 swave=0b
-if exist(wavelength) then begin
+if is_number(wavelength) || is_string(wavelength) then begin
  iwave=strupcase(strtrim(wavelength,2))
  owave=strupcase(strtrim(index.wave_len,2))
  werr='No images matching wavelength - '+iwave
@@ -612,6 +630,12 @@ if (count gt 0) && (count ne n_elements(files)) then begin
  count=n_elements(files)
 endif
 type=self->ftype(count)
+
+if count eq 0 then begin
+ mprint,'No matching files found.'
+ files=''
+endif
+
 return,files
 end
 

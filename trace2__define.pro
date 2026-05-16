@@ -25,7 +25,7 @@ end
 
 function trace2::search,tstart,tend,_ref_extra=extra
 
-return,self->trace::search(tstart,tend,flevel=0,_extra=extra)
+return,self->trace::search(tstart,tend,level=0,_extra=extra)
 
 end
 

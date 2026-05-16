@@ -15,7 +15,7 @@
 ;
 ; Keywords    : 
 ;               VERBOSE = Set for verbose output
-;              mprint ERR = Error message
+;               ERR = Error message
 ;                   
 ; History     : 1-Dec-2019, Zarro (ADNET)
 ;              30-Dec-2019, Zarro (ADNET

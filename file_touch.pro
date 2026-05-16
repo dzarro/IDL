@@ -33,7 +33,7 @@
 ;               16-Nov-2019, Zarro (ADNET) - added call to WIN_TOUCH
 ;               16-Nov-2025, Zarro (Retired) - added support for environment variables in file name
 ;               26-Nov-2025, Zarro (Retired) - added call to CHMOD
-;                5-May-2026, Zarro (Retired) - added check for SSW version of WIN_TOUCH 
+;                5-May-2026, Zarro (Retired) - added check for SSW version of TOUCH 
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
@@ -94,7 +94,7 @@ if windows then begin
   if file_test(cmd,/reg) then break
   cmd=concat_dir(get_temp_dir(),'touch.exe')
   if file_test(cmd,/reg) then break
-  sock_get,ssw_server()+'/solarsoft/gen/exe/windows/touch.exe',out_dir=get_temp_dir(),local=cmd
+  sock_get,ssw_server()+'/solarsoft/gen/exe/windows/touch.exe',out_dir=get_temp_dir(),local=cmd,/no_update,/no_check
   if file_test(cmd,/reg) then break
   cmd=win_touch()
   if file_test(cmd,/reg) then break
@@ -102,8 +102,6 @@ if windows then begin
   mprint,err,_extra=extra & return
  endrep until 1b
 endif
-
-if keyword_set(verbose) then mprint,cmd,_extra=extra
 
 flag='-m'
 if keyword_set(access) then flag='-a'
@@ -125,6 +123,7 @@ if valid_time(time) then begin
 endif else cmd=cmd+' '+flag+' -r '+ftime+' '+dfile
 
 dprint,'% cmd: ',cmd
+if keyword_set(verbose) then mprint,cmd,_extra=extra
 
 espawn,cmd,output,_extra=extra,err=err,/noshell
 if is_string(err) then begin

@@ -32,6 +32,7 @@
 ;               NO_DIR_CHECK = set to skip checking if OUT_DIR exist
 ;               and is writeable.
 ;               KEEP_NEWER = do not download if local file is newer (unless /CLOBBER is set)
+;               NO_UPDATE_TIME = do not update timestamp of locally downloaded file to that of remote counterpart
 ;
 ; History     : 27-Dec-2009, Zarro (ADNET) - written
 ;                8-Oct-2010, Zarro (ADNET) - dropped support for
@@ -135,12 +136,13 @@
 ;               - added check for gzip encoded remote file
 ;               11-Nov-2025, Zarro (Retired)
 ;                - added KEEP_NEWER
+;               12-May-2026, Zarro (Retired)
+;                 - added NO_UPDATE_TIME
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 ;-----------------------------------------------------------------  
 function sock_get_callback, status, progress, data  
-
 
 if (progress[0] eq 1) && (progress[1] gt 0) then begin
  if ptr_valid(data) then begin
@@ -187,7 +189,7 @@ pro sock_get_main,url,out_name,clobber=clobber,local_file=local_file,no_check=no
   progress=progress,err=err,status=status,cancelled=cancelled,$
   out_dir=out_dir,_ref_extra=extra,verbose=verbose,$
   use_local_time=use_local_time,temp_dir=temp_dir,$
-  no_dir_check=no_dir_check,keep_newer=keep_newer         
+  no_dir_check=no_dir_check,keep_newer=keep_newer,no_update_time=no_update_time        
                   
 err='' & status=0
 cancelled=0b
@@ -196,6 +198,7 @@ use_local_time=keyword_set(use_local_time)
 verbose=keyword_set(verbose)
 clobber=keyword_set(clobber)
 keep_newer=keyword_set(keep_newer)
+no_update_time=keyword_set(no_update_time)
 
 if ~is_url(url,_extra=extra,/scalar,err=err,verbose=verbose) then return
 
@@ -259,7 +262,6 @@ have_file=oinfo.exists
 ; return
 ;endif
  
-if verbose then mprint,'Downloading to: '+ofile,_extra=extra
 osize=0l & otime=0.
 if have_file then begin
  osize=oinfo.size
@@ -313,8 +315,8 @@ if newer_local_file && keyword_set(keep_newer) && ~clobber then begin
  status=1
  return
 endif
- 
-if (bsize gt 0) && (osize gt 0) then size_change=(bsize ne osize)
+
+if (bsize gt 0) && (osize gt 0) then size_change=(long(bsize) ne long(osize))
 download=~have_file || clobber || size_change || time_change || is_string(query)
 if ~download then begin
  if verbose then begin
@@ -327,6 +329,7 @@ endif
 
 ;-- initialize object 
 
+if verbose then mprint,'Downloading to: '+ofile,_extra=extra
 ourl=obj_new('idlneturl2',durl,_extra=extra,browser=used_browser)
 
 ;-- show progress bar?
@@ -440,7 +443,7 @@ local_file=ofile
 
 ;-- update timestamp of downloaded file
    
-if valid_time(rdate) then begin
+if valid_time(rdate) && ~no_update_time then begin
  ldate=rdate
  if use_local_time then ldate=anytim2utc(anytim2tai(rdate)+ut_diff(/sec),/vms)
  file_touch,ofile,ldate

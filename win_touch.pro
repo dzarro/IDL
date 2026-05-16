@@ -14,7 +14,7 @@
 ; Keywords    : ERR = error message
 ;
 ; History     : 15-Nov-2019, Zarro (ADNET)
-;                6-May-2026, Zarro (Retired) - added more error checking
+;                6-May-2026, Zarro (Retired) - improved error checking
 ;
 ; Contact     : DZARRO@SOLAR.STANFORD.EDU
 ;-

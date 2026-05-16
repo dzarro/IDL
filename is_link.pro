@@ -16,7 +16,7 @@
 ; Keywords    : DIRECTORY = limit check to directory
 ;               FILE = limit check to file
 ;
-; History     : 17 November 2025 Zarro (Consultant/Retired) - written
+; History     : 17 November 2025 (Zarro, Retired) - written
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-

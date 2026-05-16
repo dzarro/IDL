@@ -19,11 +19,12 @@
 ;
 ; History     : 26 October 2015, Zarro (ADNET) - written
 ;                8 September 2025, Zarro (Retired) - set COMPRESS to 0b if FILE is already compressed
+;               14 May 2026, Zarro (Retired) - added compression LEVEL keyword
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-function file_stream,file,compress=compress,err=err,bsize=bsize,osize=osize
+function file_stream,file,compress=compress,err=err,bsize=bsize,osize=osize,level=level
 
 err=''
 bsize=0l
@@ -55,7 +56,8 @@ readu,lun,data
 close_lun,lun
 
 if keyword_set(compress) then begin
- if compressed then compress=0b else data=zlib_compress(temporary(data),/gzip)
+ if is_number(level) then nlevel= (0 > fix(level) < 9)
+ if compressed then compress=0b else data=zlib_compress(temporary(data),/gzip,level=nlevel)
 endif
 
 bsize=n_elements(data)
