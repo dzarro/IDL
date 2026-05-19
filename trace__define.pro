@@ -221,27 +221,6 @@ end
 
 ;--------------------------------------------------------------------------
 
-function trace::overlap,tstart,tend,dstart=dstart,dend=dend
-
-dstart=-1.d & dend=-1.d
-if ~valid_time(tstart) || ~valid_time(tend) then return,0b
-
-mtimes=self->mission_times()
-mstart=mtimes[0] & mend=mtimes[1]
-times=anytim2tai([tstart,tend])
-dstart=min(times) & dend=max(times)
-outside= ((dstart lt mstart) && (dend lt mstart)) || $
-         ((dstart gt mend) && (dend gt mend))
-
-if ~outside then begin
- dstart =  dstart > mstart
- dend = dend < mend
-endif
-
-return,~outside
-end
-
-;--------------------------------------------------------------------------
 
 function trace::search,tstart,tend,_ref_extra=extra,vso=vso,level=level,cat=cat
   
@@ -271,34 +250,36 @@ end
 ;-------------------------------------------------------------------------
 ;-- LEVEL 1 search wrapper
 
-function trace::level1,tstart,tend,_ref_extra=extra,wavelength=wavelength,count=count,type=type,verbose=verbose,err=err,nearest=nearest
-verbose=keyword_set(verbose)
-nearest=keyword_set(nearest)
-end_time=valid_time(tend)
+function trace::level1,tstart,tend,_ref_extra=extra,wavelength=wavelength,count=count,type=type,err=err,nearest=nearest,times=times
 
-self->valid_times,tstart,tend,err=err
+err=''
+count=0L & type='' & times=-1
+nearest=keyword_set(nearest) || ~valid_time(tend)
+self->valid_times,tstart,tend,dstart=dstart,dend=dend,err=err
 if is_string(err) then return,''
 
-server=trace_server(_extra=extra,path=path,level=1,verbose=verbose,err=err)
+server=trace_server(_extra=extra,path=path,level=1,err=err)
 if is_string(err) then return,''
-if verbose then mprint,'Searching '+server+' for Leve1 1 files...'
 
 s=obj_new('site')
 s->setprop,rhost=server,topdir=path,/full,ext='fts',delim='/'
 if is_number(wavelength) || is_string(wavelength) then s->setprop,ftype='.'+trim(wavelength)
-files=s->search(tstart,tend,_extra=extra,count=count)
+
+files=s->search(dstart,dend,_extra=extra,count=count,/no_check,err=err,times=times)
 obj_destroy,s
 
-if (nearest || ~valid_time(end_time)) && (count gt 1) then begin
- times=parse_time(files,/tai)
- diff=abs(times-anytim2tai(tstart))
- chk=where(diff eq min(diff),count)
- files=files[chk[0]]
+if count eq 0 then begin
+ err='No matching files found.'
+ times=-1
+ mprint,err
+ return,''
 endif
 
-if count eq 0 then begin
- mprint,'No matching files found.'
- files=''
+if nearest && (count gt 1) then begin
+ diff=abs(times-anytim2tai(dstart))
+ chk=where(diff eq min(diff),count)
+ files=files[chk[0]]
+ times=times[chk[0]]
 endif
 
 type=self->ftype(count)
@@ -437,73 +418,83 @@ return,self.have_level0.value
 end
   
 ;------------------------------------------------------------------------
+
+function trace::overlap,a,b
+
+if n_elements(a)*n_elements(b) eq 0 then return,0b
+
+amin=min(a,max=amax)
+bmin=min(b,max=bmax)
+
+;over= (bmin ge amax) || (bmax le amin)
+
+return,(bmin le amax) && (bmax ge amin)
+
+end
+
+;------------------------------------------------------------------------
 ;-- validate input times
 
-pro trace::valid_times,tstart,tend,err=err,_extra=extra
+pro trace::valid_times,tstart,tend,dstart=dstart,dend=dend,err=err,_extra=extra
 
 err=''
-if valid_time(tstart) && ~valid_time(tend) then begin
- dstart=get_def_times(tstart,dend=dend,_extra=extra,/ecs)
- tstart=dstart & tend=dend 
-endif else begin
- if ~valid_time(tstart) && ~valid_time(tend) then begin
-  err='Invalid search times.'
-  mprint,err
-  return
- endif
-endelse
+dstart=-1 & dend=-1
 
-overlap=self->overlap(tstart,tend,dstart=dstart,dend=dend)
-if ~overlap then begin
- err='Search times outside mission lifetime.'
+if ~valid_time(tstart) then begin
+ err='Invalid search start time.'
+ mprint,err
+ return
+endif
+ 
+dstart=anytim2tai(tstart)
+dtemp=anytim2utc(tstart)
+dtemp.time=24L*3600L*1000L-1L
+if ~valid_time(tend) then dend=anytim2tai(dtemp) else dend=anytim2tai(tend)
+
+mtimes=self->mission_times()
+chk=self->overlap(mtimes,[dstart,dend])
+if ~chk then begin
+ err='Search times outside TRACE mission lifetime.'
  mprint,err
  mtimes=self->mission_times(/ecs)
  print,'   '+mtimes[0]+' -> '+mtimes[1]
-endif else begin
- tstart=anytim2utc(dstart,/ecs) & tend=anytim2utc(dend,/ecs)
-endelse  
+ return
+endif
    
 return & end
 ;-------------------------------------------------------------------------
 ;-- Level 0 search wrapper
 
-function trace::level0,tstart,tend,_ref_extra=extra,verbose=verbose,count=count,$
+function trace::level0,tstart,tend,_ref_extra=extra,count=count,$
                        times=times,type=type,err=err,nearest=nearest
 
-err=''
-verbose=keyword_set(verbose)
-nearest=keyword_set(nearest)
-
+err='' & count=0L & type=''
 return_times=arg_present(times)
-end_time=valid_time(tend)
 times=-1
-count=0l
-type=''
 
-self->valid_times,tstart,tend,err=err
+nearest=keyword_set(nearest) || ~valid_time(tend)
+self->valid_times,tstart,tend,dstart=dstart,dend=dend,err=err
 if is_string(err) then return,''
 
-server=trace_server(level=0,path=path,err=err,verbose=verbose,_extra=extra)
+server=trace_server(level=0,path=path,err=err,_extra=extra)
 if is_string(err) then return,''
 
-if verbose then mprint,'Searching '+server+' for Level 0 files...'
 path=server+path
-tstart=anytim2tai(tstart) & tend=anytim2tai(tend)
-
-week_id='week'+self->time2week(tstart,tend,time_id=time_id)
+week_id='week'+self->time2week(dstart,dend,time_id=time_id)
 
 ;-- gather list of actual files on server
 
 wpath=path+'/'+week_id
 upath=get_uniq(wpath)
 for i=0,n_elements(upath)-1 do begin
- ufiles=sock_find(upath[i],'tri*',count=ucount)
+ ufiles=sock_find(upath[i],'tri*',count=ucount,/no_check)
  if ucount gt 0 then tfiles=append_arr(tfiles,ufiles,/no_copy)
 endfor
 
 count=n_elements(tfiles)
 if count eq 0 then begin
- mprint,'No matching files found.'
+ err='No matching files found.'
+ mprint,err
  return,''
 endif
 
@@ -512,18 +503,14 @@ endif
 sfiles=path+'/'+week_id+'/tri'+time_id
 files=str_same(sfiles,tfiles,count=count)
 
-if (nearest || ~valid_time(end_time)) && (count gt 1) then begin
- nfile=self->nearest(files,tstart,count=count,err=err,_extra=extra)  
+if nearest && (count gt 1) then begin
+ nfile=self->nearest(files,dstart,count=count,err=err,_extra=extra)  
  if count gt 0 then files=nfile
-endif
- 
-if count eq 0 then begin
- mprint,'No matching files found.'
- files=''
 endif
  
 type=self->ftype(count)
 if return_times then times=self->ftimes(files,delim='.')  
+
 return,files
 end
 
@@ -622,19 +609,30 @@ end
 ;--------------------------------------------------------------------------
 ;-- VSO search wrapper
 
-function trace::vso,tstart,tend,_ref_extra=extra,type=type,count=count,verbose=verbose
-if keyword_set(verbose) then mprint,'Searching VSO...'
-files=vso_files(tstart,tend,inst='trace',_extra=extra,window=3600.,/recover_url,count=count)
-if (count gt 0) && (count ne n_elements(files)) then begin
+function trace::vso,tstart,tend,_ref_extra=extra,type=type,count=count,verbose=verbose,err=err
+
+err='' & type=''
+nearest=keyword_set(nearest) || ~valid_time(tend)
+self->valid_times,tstart,tend,dstart=dstart,dend=dend,err=err
+if is_string(err) then return,''
+
+verbose=keyword_set(verbose)
+if verbose then mprint,'Searching VSO...'
+
+files=vso_files(tstart,tend,inst='trace',_extra=extra,window=3600.,/recover_url,count=count,verbose=verbose,err=err)
+
+if count eq 0 then begin
+ err='No matching files found.'
+ mprint,err
+ return,files
+endif
+
+if (count ne n_elements(files)) then begin
  files=get_uniq(files)
  count=n_elements(files)
 endif
-type=self->ftype(count)
 
-if count eq 0 then begin
- mprint,'No matching files found.'
- files=''
-endif
+type=self->ftype(count)
 
 return,files
 end

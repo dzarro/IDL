@@ -38,11 +38,8 @@ function vso_files,tstart,tend,times=times,sizes=sizes,count=count,$
                     _ref_extra=extra,window=window,wmin=wmin,fids=fids,$
                    recover_urls=recover_urls,err=err
 
-return_sizes=arg_present(sizes)
-return_times=arg_present(times)
-
 count=0L
-times=-1.0d & sizes=''
+times=-1.0d & sizes='' & wmin=''
 urls='' & count=0 & nearest=0b & fids=''
 failure='No records with URLs found.'
 err=''
@@ -73,16 +70,15 @@ endif
 ;-- try to recover missing URL's
 
 chk=where(strtrim(records.url,2) eq '',bcount)
-
 if (bcount gt 0) then begin
  if ~keyword_set(recover_urls) then begin
   err=failure
-  mprint,failer & return,''
+  mprint,err & return,''
  endif
  rchk=vso_get(records[0],/nodown)
  if rchk.url eq '' then begin
-  err=failuer
-  mprint,failure & return,''
+  err=failure
+  mprint,err & return,''
  endif
  mprint,'Building URls...'
  stc=url_parse(rchk.url)
@@ -100,32 +96,31 @@ if count gt 1 then begin
  count=n_elements(records)
 endif
 
-urls=records.url
-have_sizes=have_tag(records,'size')
-have_wave=have_tag(records,'wave')
-
+times=anytim2tai(records.time.start)
 if nearest then begin
  count=1
- dtimes=anytim2tai(records.time.start)
- diff=abs(dtimes-dstart)
+ diff=abs(times-dstart)
  ok=where(diff eq min(diff))
- ok=ok[0]
- urls=records[ok].url
- if have_sizes then sizes=trim(records[ok].size)
- if have_wave then wmin=trim(records[ok].wave.min)
- if n_elements(wmin) eq 1 then wmin=wmin[0]
- return,urls 
+ records=records[ok[0]]
+ times=times[ok[0]]
 endif
 
-if return_sizes && have_sizes then begin
- sizes=strtrim(records.size,2)
+urls=records.url
+fids=records.fileid
+
+have_wave=have_tag(records,'wave')
+if have_wave then wmin=trim(records.wave.min)
+ 
+have_sizes=have_tag(records,'size')
+if have_sizes then begin
+ sizes=trim(records.size)
  chk=where(long(sizes) eq 0l,dcount)
  if dcount gt 0 then sizes[chk]=''
 endif
 
-if arg_present(wmin) && have_wave then wmin=strtrim(records.wave.min,2)
-if return_times then times=anytim2tai(records.time.start)
-if n_elements(wmin) eq 1 then wmin=wmin[0]
+if count eq 1 then begin
+ times=times[0] & urls=urls[0] & wmin=wmin[0] & sizes=sizes[0] & fids=fids[0]
+endif
 
 return,urls
 

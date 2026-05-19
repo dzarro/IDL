@@ -3,7 +3,7 @@
 ;                  
 ; Name        : FILE2BASE64
 ;               
-; Purpose     : Convert file to BASE64
+; Purpose     : Convert file to BASE64 encoded format
 ;                             
 ; Category    : system utility 
 ;               

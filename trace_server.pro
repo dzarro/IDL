@@ -46,8 +46,9 @@ for i=0,n_elements(servers)-1 do begin
 endfor
 
 if ~network then err='Network connection currently unavailable.'
-if verbose then mprint,err,/info
+mprint,err,/info
 
+if verbose then mprint,'Searching '+server+' for Level '+trim(level)+' files.'
 return,server
 
 end
