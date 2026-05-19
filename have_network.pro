@@ -90,7 +90,7 @@ test_path=purl.path
 test_scheme=purl.scheme
 test_url=test_scheme+'://'+test_host+':'+test_port
 if full_path && is_string(test_path) then test_url=test_url+'/'+test_path
-if ~is_number(interval) then interval=30.
+if ~is_number(interval) then interval=3600.
 now=systime(/seconds)
 
 ;-- check if this url was checked recently
