@@ -13,7 +13,7 @@
 ;              
 ; Outputs     : None
 ;
-; Keywords    : OUT_FILE = name of converted file [def = input file name with .asc suffix]
+; Keywords    : OUT_FILE = name of converted file [def = input file name with .base64 suffix]
 ;               COMPRESS = compress via GZIP
 ;               VERBOSE = set for verbose output
 ;               ERR = error string
@@ -23,28 +23,34 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
 
-pro file2base64,file,err=err,compress=compress,out_file=out_file,verbose=verbose,_ref_extra=extra
+pro file2base64,file,err=err,compress=compress,out_file=out_file,verbose=verbose,_ref_extra=extra,overwrite=overwrite
 
 err=''
 if is_blank(file) then begin
  err='Missing input filename.'
- pr_syntax,'bin2asc,filename
+ pr_syntax,'file2base64,filename
  return
 endif
 
-;-- convert file to byte stream
-
 verbose=keyword_set(verbose)
 compress=keyword_set(compress)
-
-barr=file_stream(file,err=err,compress=compress,_extra=extra)
-if is_string(err) then return
+overwrite=keyword_set(overwrite)
 
 fdir=file_dirname(file)
 ifile=file_basename(file)
-fname=file_break(ifile,/no_ext)+'.asc'
+fname=file_break(ifile,/no_ext)+'.base64'
 ofile=concat_dir(fdir,fname)
 if is_string(out_file) then ofile=out_file
+
+if file_test(ofile,/reg) && ~overwrite then begin
+ mprint,'Encoded file "'+ofile+'" already exists. Use /OVERWRITE.
+ return
+endif
+ 
+;-- convert file to byte stream
+
+barr=file_stream(file,err=err,compress=compress,_extra=extra)
+if is_string(err) then return
 
 ;-- trap errors
 
