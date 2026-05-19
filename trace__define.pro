@@ -221,15 +221,11 @@ end
 
 ;--------------------------------------------------------------------------
 
-
 function trace::search,tstart,tend,_ref_extra=extra,vso=vso,level=level,cat=cat
   
 vso=keyword_set(vso)
 cat=keyword_set(cat)  
-if is_number(level) then level= (0 > fix(level) < 1) else begin
- vso=1
- level=-1
-endelse
+if is_number(level) then level= (0 > fix(level) < 1) else level=-1
 
 ;-- def search for VSO files
 
@@ -319,7 +315,7 @@ end
 function trace::cat_search,tstart,tend,_ref_extra=extra
 
 if self->have_level0() then files=self->cat(tstart,tend,_extra=extra) else $
- files=self->level0(tstart,tend,_extra=extra,/verb)
+ files=self->level0(tstart,tend,_extra=extra)
 
 return,files
 end
@@ -327,17 +323,17 @@ end
 ;------------------------------------------------------------------------
 ;-- search TRACE catalog
 
-function trace::cat,tstart,tend,count=count,err=err,type=type,times=times,verbose=verbose,_ref_extra=extra
+function trace::cat,tstart,tend,count=count,err=err,type=type,times=times,verbose=verbose,_ref_extra=extra,nearest=nearest
 
-verbose=keyword_set(verbose)
-if verbose then mprint,'Searching catalog for Level 0 files...'
-count=0
-err=''
+err='' & count=0L & type=''
 return_times=arg_present(times)
 times=-1
-type=self->ftype()
-self->valid_times,tstart,tend,err=err
+
+nearest=keyword_set(nearest) || ~valid_time(tend)
+self->valid_times,tstart,tend,dstart=dstart,dend=dend,err=err
 if is_string(err) then return,''
+
+verbose=keyword_set(verbose)
 
 path=self->level0_dir()
 if is_blank(path) then begin
@@ -348,13 +344,22 @@ endif
 
 if ~self->have_level0(err=err) then return,''
 
-trace_cat, tstart,tend, catalog, status=status,loud=verbose
+if verbose then mprint,'Searching catalog for Level 0 files...
+trace_cat, dstart,dend, catalog, status=status,loud=verbose
 if status eq 0 then return,''
 
 trace_cat2data,catalog,files,-1,/filedset,loud=verbose
 count=n_elements(files)
+
+if return_times || (nearest && (count gt 1)) then times=self->ftimes(files)
+if  nearest && (count gt 1) then begin
+ diff=abs(times-anytim2tai(dstart))
+ chk=where(diff eq min(diff),count)
+ files=files[chk[0]]
+ times=times[chk[0]]
+endif
+
 type=self->ftype(count)
-if return_times then times=self->ftimes(count)
 return,files
 end
 
