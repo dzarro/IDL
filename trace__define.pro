@@ -530,8 +530,8 @@ err='' & count=0 & image_no=-1
 if ~valid_time(tstart) || is_blank(files) then return,''
 nweek=self->time2week(tstart,time_id=ntime)
 ftimes=stregex(files,'.+tri(.+)',/sub,/ext)
-chk=where(ftimes[1,*] eq ntime,ncount)
-if ncount eq 0 then begin
+chk=where(ftimes[1,*] eq ntime,count)
+if count eq 0 then begin
  err='No nearest time found.'
  mprint,err
  return,''
@@ -539,7 +539,9 @@ endif
 
 nfile=files[chk[0]]
 
-self->read,nfile,-1,index=index,err=err
+if ~arg_present(wavelength) && ~arg_present(dimensions) then return,nfile
+
+self->read,nfile,-1,index=index,err=err,out_dir=get_temp_dir()
 if is_string(err) then begin
  mprint,err
  return,''
@@ -688,7 +690,7 @@ end
 ;-- FITS reader
 
 pro trace::read,file,data,_ref_extra=extra,image_no=image_no,err=err,$
-                all=all,no_prep=no_prep,index=index
+                all=all,no_prep=no_prep,index=index,local_file=local_file
 
 err=''
 
@@ -699,7 +701,7 @@ if is_blank(file) then begin
  return
 endif
 
-self->getfile,file,local_file=ofile,_extra=extra,err=err,count=count
+self->getfile,file,local_file=local_file,_extra=extra,err=err,count=count
 if count eq 0 then return
 
 self->empty
@@ -717,14 +719,14 @@ do_prep=~keyword_set(no_prep)
 
 ;-- read files
 
-nfiles=n_elements(ofile)
+nfiles=n_elements(local_file)
 j=0
 self->binaries
 
 cd,cur=cdir
 for i=0,nfiles-1 do begin
  err=''
- dfile=ofile[i]
+ dfile=local_file[i]
 
  valid=self->is_valid(dfile,level=level,_extra=extra,err=err,decomp=decomp)
  if ~valid then continue
