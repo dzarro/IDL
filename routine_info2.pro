@@ -1,4 +1,4 @@
-function routine_info2,routine,_extra=extra,err=err
+function routine_info2,routine,_extra=extra,err=err,verbose=verbose
 
 ;-- trap errors
 
@@ -7,7 +7,7 @@ error=0
 catch,error
 if (error ne 0)  then begin
  err=err_state()
- mprint,err
+ if keyword_set(verbose) then mprint,err,_extra=extra
  catch,/cancel
  message,/reset
  error=0

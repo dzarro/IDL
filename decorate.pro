@@ -16,6 +16,7 @@
 ;
 ; Keywords    : SUB_PROG = name of procedure or function within program to decorate 
 ;                         (optional if a sub program is embedded within program code)
+;               METHOD = method name if program is an object class definition
 ;               VERBOSE = set for verbose output
 ;               ERR = error string
 ;                          
@@ -24,74 +25,65 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-    
 
-pro decorate,program,wrapper,_ref_extra=extra,verbose=verbose,sub_prog=sub_prog,err=err
+pro decorate,program,wrapper,_ref_extra=extra,verbose=verbose,err=err
 
 err=''
 verbose=keyword_set(verbose)
-p1=prog_type(program,call=pcall,prog_file=pfile,index=index,sub_prog=sub_prog,verbose=verbose,err=err)
-if (p1 eq 0) then return
+redecorate=keyword_set(redecorate)
 
-p2=prog_type(wrapper,err=err)
-if (p2 eq 0) then return
+p1=prog_type(program,call=pcall,fname=fname,verbose=verbose,err=err,$
+             _extra=extra,class=class,code=pcode)
+if (p1 eq 0) || is_string(err) then return
+
+p2=prog_type(wrapper,call=wcall,fname=wname,err=err,verbose=verbose)
+if (p2 eq 0) || is_string(err) then return
 
 ;-- create wrapper program
 
-pcall=strcompress(pcall)
-chk=where(stregex(pcall,'^[f]_extra',/bool,/fold),count)
-if count eq 1 then begin
- ic=chk[0] & pcall[ic]=strep2(pcall[ic],'_extra','_ref_extra')
-endif
-
-pcall2=pcall
-chk=where(stregex(pcall2,'_ref_extra',/bool,/fold),count)
-if count eq 1 then begin
- ic=chk[0] & pcall2[ic]=strep2(pcall2[ic],'_ref_extra','_extra')
-endif
-
-if is_string(sub_prog) then prog=sub_prog else prog=program
-pname=prog+'_temp' 
-np=n_elements(pcall)
-sp=strpos(strlowcase(pcall2[0]),strlowcase(prog))
-pcall2[0]=strmid(pcall2[0],sp,strlen(pcall2[0]))
+pcall=strlowcase(strcompress(pcall))
+wcall=strlowcase(strcompress(wcall))
 
 ;-- format according to whether program/wrapper is procedure or function
 
+pcall2=pcall
+pcall2=str_repv(pcall2,'_ref_e','_e',/fold)
+
+prog=fname
+pname=fname+'_'+get_rid()
+cname=pname
+if class then cname='self->'+cname
+np=n_elements(pcall)
+sp=strpos(pcall2[0],prog)
+pcall2[0]=strmid(pcall2[0],sp,strlen(pcall2[0]))
 if p1 eq 2 then begin
- pcall2[0]=strep2(pcall2[0],prog,'out='+pname+'(')
- pcall2[0]=strep2(pcall2[0],',','')
+ pcall2[0]=str_repv(pcall2[0],prog,'out='+cname+'(',/fold)
+ pcall2[0]=str_repv(pcall2[0],',','',/fold,/first)
  pcall2[np-1]=pcall2[np-1]+')'
-endif else pcall2[0]=strep2(pcall2[0],prog,pname)
+endif else pcall2[0]=str_repv(pcall2[0],prog,cname,/fold)
 
-if p2 eq 2 then wcall='wout='+wrapper+'(_extra=extra)' else wcall=wrapper+',_extra=extra'
+wcall2=wcall
+np=n_elements(wcall)
+sp=strpos(wcall2[0],wname)
+wcall2[0]=strmid(wcall2[0],sp,strlen(wcall2[0]))
+if p2 eq 2 then begin
+ wcall2[0]=str_repv(wcall2[0],wname,'out='+wname+'(',/fold)
+ wcall2[0]=str_repv(wcall2[0],',','',/fold,/first)
+ wcall2[np-1]=wcall2[np-1]+')'
+endif 
 
-temp=[pcall,'',wcall,'',pcall2,'',wcall]
+temp=[pcall,'',wcall2,'',pcall2,'',wcall2]
 if p1 eq 2 then temp=[temp,'','return,out','end'] else temp=[temp,'','return','end'] 
-itemp=temp
+wcode=temp
 
 ;-- decorate program by modifying and recompiling original program with call to wrapper program. 
 
-ptemp=rd_ascii(pfile)
-ptemp[index]=strep2(ptemp[index],prog,pname)
+pcode[0]=str_repv(pcode[0],prog,pname,/fold)
 
-;-- write and compile wrapper and decorated programs
+;-- compile wrapper and decorated programs
 
-temp=ptemp
-for i=0,1 do begin
- out_file=get_temp_file('test.pro')
- if i eq 0 then begin
-  pro_dir=file_dirname(out_file)
-  if i eq 0 then cd,pro_dir,current=cdir
- endif
- pro_name=file_basename(out_file,'.pro')
- out=[temp,' ','pro '+pro_name,'return & end']
- if verbose then mprint,'Writing to '+out_file
- wrt_ascii,out,out_file,/no_pad
- resolve_routine,pro_name,/either,/compile_full_file,quiet=1-verbose
- temp=itemp
-endfor
-cd,cdir
+compile,pcode,err=err
+if is_string(err) then return
+compile,wcode,err=err
 
-;file_delete,out_file,/quiet
-
- return
- end
+return
+end
