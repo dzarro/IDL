@@ -110,7 +110,6 @@ bfile=file_break(file)
 for i=0,n_elements(acro)-1 do begin
  if stregex(bfile,acro[i],/bool,/fold) then begin
   fclass=class[i]
-  message,'guessing '+strupcase(fclass),/info
   break
 endif
 endfor
@@ -124,7 +123,9 @@ endif
 
 if is_blank(fclass) then fclass='fits'
 
-return,strupcase(fclass)
+fclass=strupcase(fclass)
+mprint,'Guessing '+fclass,_extra=extra
+return,fclass
 end
 
 ;-------------------------------------------------------------------------

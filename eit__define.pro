@@ -28,8 +28,10 @@
 ;                 even when data was already prepped
 ;               25-July-2015, Zarro (ADNET)
 ;                - removed unnecessary use of Z-buffer
-;               28-September-2025, Zarro (Consultant/Retired) 
+;               28-September-2025, Zarro (Retired) 
 ;                - fixed bug with re-reading calibration files
+;               10-June-2026, Zarro (Retired)
+;                - made WCS the default and switched off default roll correction
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -83,11 +85,20 @@ if ~have_cal then begin
  if self->have_path() then begin
   server=eit_server(network=network)
   if network then begin
+   code=obj_new('code')
    if verbose then message,'Will attempt to download calibration files from remote server...',/info
-   sub_proc,'eit_norm_response','readfits(','eit_cal_readfits(',verbose=verbose
-   sub_proc,'eit_find_last_cal','readfits(','eit_cal_readfits(',verbose=verbose
-   sub_proc,'eit_findcalgroup','readfits(','eit_cal_readfits(',verbose=verbose
+   code->load,'eit_norm_response'
+   code->replace,'readfits(','eit_cal_readfits(',verbose=verbose
+   code->load,'eit_find_last_cal'
+   code->replace,'readfits(','eit_cal_readfits(',verbose=verbose
+   code->load,'eit_findcalgroup'
+   code->replace,'readfits(','eit_cal_readfits(',verbose=verbose
+   
+   ;sub_proc,'eit_norm_response','readfits(','eit_cal_readfits(',verbose=verbose
+   ;sub_proc,'eit_find_last_cal','readfits(','eit_cal_readfits(',verbose=verbose
+   ;sub_proc,'','readfits(','eit_cal_readfits(',verbose=verbose
    have_cal=1b & err=''
+   obj_destroy,code
   endif
  endif
 endif
@@ -139,9 +150,6 @@ type='' & times=-1 & sizes=''
 f=vso_files(tstart,tend,_extra=extra,inst='EIT',wmin=wmin,count=count,$
                      times=times)
 
-;-- filter out EFZ files
-
-if count gt 0 then chk=where(stregex(f,'\/efz',/bool),count)
 
 if count eq 0 then begin
  message,'No EIT files found.',/info
@@ -348,10 +356,11 @@ end
 ;--------------------------------------------------------------------------
 ;-- FITS reader
 
-pro eit::read,file,_ref_extra=extra,image_no=image_no
+pro eit::read,file,_ref_extra=extra,image_no=image_no,roll_correct=roll_correct
 
 ;-- download if URL
 
+roll_correct=keyword_set(roll_correct)
 self->getfile,file,local_file=ofile,_extra=extra
 if is_blank(ofile) then return
 
@@ -367,14 +376,13 @@ for i=0,nfiles-1 do begin
  if ~valid then continue
  
  if (level eq 1) then begin
-  self->fits::read,ofile[i],_extra=extra,/append
+  self->fits::read,ofile[i],_extra=extra,/append,/wcs
   j=self->get(/count)
   continue
  endif
 
 ;-- prep level 0 
 
- 
  if have_path then read_eit,ofile[i],eindex,/nodata else $
   self->fits::read,ofile[i],_extra=extra,index=eindex,/nodata
  
@@ -387,8 +395,8 @@ for i=0,nfiles-1 do begin
  endif else image_no=0
  nimg=n_elements(image_no)
  for k=0,nimg-1 do begin
-  skip=stregex(eindex[k].object,'(partial|dark|calibration|readout|continous|lamp)',/bool,/fold)
-  if skip then message,'Skipping prep for partial FOV or engineering image.',/info
+  skip=stregex(eindex[k].object,'(test|charge|partial|dark|calibration|readout|continous|lamp)',/bool,/fold)
+  if skip then mprint,'Skipping prep for partial FOV or engineering image.',_extra=extra
   delvarx,data
   if (image_no[k] gt -1) and (image_no[k] lt nsub) then begin
    if have_path && have_cal then begin
@@ -398,15 +406,16 @@ for i=0,nfiles-1 do begin
       data=data[*,*,image_no[k]]
       index=index[image_no[k]] 
      endif
+	 index=fitshead2struct(header)
     endif else begin
-     self->prep,ofile[i],header,data,image_no=image_no[k],_extra=extra,/no_roll
+     self->prep,ofile[i],header,data,image_no=image_no[k],_extra=extra,no_roll=~roll_correct
      index=fitshead2struct(header)
     endelse
     index=self->partial(index,_extra=extra)
    endif else begin
     if ~have_path then xack,err1,/suppress,_extra=extra
     if ~have_cal then xack,err2,/suppress,_extra=extra
-    message,'Skipping prep.',/info
+    mprint,'Skipping prep.',_extra=extra
     self->readfits,ofile[i],data,index=index,_extra=extra
     if nsub gt 1 then begin
      index=index[image_no[k]] 
@@ -418,9 +427,9 @@ for i=0,nfiles-1 do begin
     index.naxis1=sz[1]
     index.naxis2=sz[2]
     index=rep_tag_value(index,1,'naxis3')
-    if index.sc_roll ne 0. then sc_roll_correct,index,data,_extra=extra
+    if (index.sc_roll ne 0.) && roll_correct then sc_roll_correct,index,data,_extra=extra
     if ~have_tag(index,'wavelnth') then index=add_tag(index,'0','wavelnth')
-    index2map,index,data,map,/no_copy,_extra=extra,/no_roll
+    index2map,index,data,map,/no_copy,_extra=extra,/wcs
     map.id='SOHO EIT '+trim(index.wavelnth)
     index=rep_tag_value(index,file_basename(ofile[i]),'filename')
     self->set,j,map=map,index=index,/no_copy
@@ -436,7 +445,7 @@ if count gt 0 then begin
   self->set,i,/log_scale,grid=30,/limb
   self->colors,i
  endfor
-endif else message,'No maps created.' ,/info
+endif else mprint,'No maps created,',_extra=extra
 
 return & end
 
@@ -449,7 +458,7 @@ if ~is_struct(index) then return,-1
 count=n_elements(index)
 if count eq 1 then return,0
 
-output=trim(sindgen(count))+') TIME: '+trim(anytim2utc(index.date_obs,/vms))+ $
+output=' TIME: '+trim(anytim2utc(index.date_obs,/vms))+ $
        ' WAVELENGTH: '+strpad(trim(index.wavelnth),4,/after)
 
 list=xsel_list_multi(output,/index,cancel=cancel,$
