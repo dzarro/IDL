@@ -209,6 +209,7 @@ if (error ne 0) then begin
  mprint,err,_extra=extra
  catch, /cancel
  message,/reset
+ return
  goto,bail  
 endif
   

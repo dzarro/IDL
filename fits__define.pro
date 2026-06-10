@@ -72,7 +72,6 @@ err=''
 
 self->getfile,rfile,local_file=local_file,err=err,_extra=extra,count=nfiles
 
-stop,2
 if nfiles eq 0 then return
 
 file=strtrim(local_file,2)

@@ -16,7 +16,7 @@
 ; Keywords    : ALLOW_BLANK = allow blank input string
 ;               ERR = error message
 ;             
-; History     : 17 November 2025 Zarro (Consultant/Retired) 
+; History     : 17 November 2025, Zarro (Retired) - written
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-

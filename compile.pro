@@ -32,6 +32,7 @@ if is_blank(code) then begin
 endif
 
 cd,current=cdir
+qsave=!quiet
 error=0
 catch, error
 if (error ne 0) then begin
@@ -40,6 +41,7 @@ if (error ne 0) then begin
  mprint,err,_extra=extra
  message,/reset
  cd,cdir
+ !quiet=qsave
  return
 endif
 
@@ -49,10 +51,13 @@ cd,pro_dir
 
 pro_name=file_basename(out_file,'.pro')
 out=[code,' ','pro '+pro_name,'return & end']
-if verbose then mprint,'Writing to - '+out_file
+;if verbose then mprint,'Writing to - '+out_file
 wrt_ascii,out,out_file,/no_pad
-resolve_routine,pro_name,/either,/compile_full_file,quiet=1-verbose
 
+if ~verbose then !quiet=1
+resolve_routine,pro_name,/either,/compile_full_file,quiet=~verbose
+
+!quiet=qsave
 cd,cdir
 
 return & end
