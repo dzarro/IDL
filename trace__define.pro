@@ -96,7 +96,7 @@ ref=self->which_dbase(_extra=extra,dbase_name=dbase_name,dbase_err=dbase_err)
 
 if ref.checked then begin
  err=ref.err
- if verbose then mprint,err  
+ if verbose then mprint,err,_extra=extra
  return,ref.value
 endif
  
@@ -135,7 +135,7 @@ verbose=keyword_set(verbose)
 
 if self.have_decoder.checked then begin
  err=self.have_decoder.err
- if verbose then mprint,err  
+ if verbose then mprint,err,_extra=extra
  return,self.have_decoder.value
 endif
  
@@ -161,7 +161,7 @@ endif
 ;-- try to download a copy to temporary directory
 
 warn='TRACE decompressor not found.'
-if verbose then mprint,warn+' Attempting download from SSW server...'
+if verbose then mprint,warn+' Attempting download from SSW server...',_extra=extra
 sdir=get_temp_dir()
 tdir=concat_dir(sdir,'exe')
 udir=concat_dir(tdir,wdir)
@@ -171,7 +171,7 @@ sfile=sloc+'/solarsoft/trace/binaries/'+wdir+'/'+decomp
 sock_get,sfile,out_dir=udir,_extra=extra,/no_check,local=share
 chk=file_test(share)
 if chk then begin
- if verbose then mprint,'Download succeeded.'
+ if verbose then mprint,'Download succeeded.',_extra=extra
  mklog,'SSW_BINARIES_SAVE',chklog('SSW_BINARIES')
  mklog,'SSW_BINARIES_TEMP',sdir
  mklog,'SSW_BINARIES',sdir
@@ -259,7 +259,7 @@ if is_string(err) then return,''
 
 s=obj_new('site')
 s->setprop,rhost=server,topdir=path,/full,ext='fts',delim='/'
-if is_number(wavelength) || is_string(wavelength) then s->setprop,ftype='.'+trim(wavelength)
+if is_number(wavelength) || is_string(wavelength) then s->setprop,ftype='.'+strupcase(trim2(wavelength))
 
 files=s->search(dstart,dend,_extra=extra,count=count,/no_check,err=err,times=times)
 obj_destroy,s
@@ -267,7 +267,7 @@ obj_destroy,s
 if count eq 0 then begin
  err='No matching files found.'
  times=-1
- mprint,err
+ mprint,err,_extra=extra
  return,''
 endif
 
@@ -338,13 +338,13 @@ verbose=keyword_set(verbose)
 path=self->level0_dir()
 if is_blank(path) then begin
  err='Local Level 0 archive environment ($TRACE_I1_DIR) not defined.'
- mprint,err
+ mprint,err,_extra=extra
  return,''
 endif
 
 if ~self->have_level0(err=err) then return,''
 
-if verbose then mprint,'Searching catalog for Level 0 files...
+if verbose then mprint,'Searching catalog for Level 0 files...,_extra=extra
 trace_cat, dstart,dend, catalog, status=status,loud=verbose
 if status eq 0 then return,''
 
@@ -693,6 +693,7 @@ pro trace::read,file,data,_ref_extra=extra,image_no=image_no,err=err,$
                 all=all,no_prep=no_prep,index=index,local_file=local_file
 
 err=''
+cerr=''
 
 ;-- download if URL
 
@@ -729,6 +730,7 @@ for i=0,nfiles-1 do begin
  dfile=local_file[i]
 
  valid=self->is_valid(dfile,level=level,_extra=extra,err=err,decomp=decomp)
+ 
  if ~valid then continue
 
 ;-- if level 1 then read with FITS object
@@ -796,31 +798,32 @@ for i=0,nfiles-1 do begin
   err=''
   oindex=-1 & odata=-1
   img=image_no[k]
-  mprint,'Reading image '+trim(img)
+  mprint,'Reading image '+trim2(img),_extra=extra
+  
   if decomp then self->fits::read,dfile,odata,index=oindex,exten=img,err=err,_extra=extra else $
-   self->read_comp,dfile,img,oindex,odata,_extra=extra,err=err
+   self->read_comp,dfile,img,oindex,odata,_extra=extra,err=rerr
   
   if is_string(err) then begin
-   mprint,err
+   cerr=append_arr(cerr,err)
    continue
   endif
 
   sz=size(odata)
   if (sz[0] lt 2) then begin
-   err='Image '+trim(img)+' is not 2-D.'
-   print,sz  
-   mprint,err
+   err='image# '+trim2(img)+' is not 2-D.'
+   print,sz 
+   cerr=append_arr(cerr,err)
    continue
   endif
-
+  
   if do_prep then do_prep=self->have_dbase(err=dbase_err,/verbose,/calibration)
   if do_prep then begin
-   mprint,'Prepping image '+trim(img)
+   mprint,'Prepping image '+trim2(img),_extra=extra
    extra=rem_dup_keywords(extra)  
    trace_prep,oindex,odata,pindex,pdata,/norm,/wave2point,/float,_extra=extra,/quiet
    if ~is_struct(pindex) then begin
-    err='Error prepping image '+trim(img)
-    mprint,err
+    err='Error prepping image '+trim2(img)
+    cerr=append_arr(cerr,err)
     continue
    endif
   endif else begin
@@ -829,19 +832,27 @@ for i=0,nfiles-1 do begin
 
   pindex=rep_tag_value(pindex,2l,'naxis')
   log_scale=is_number(pindex.wave_len)
-  id='TRACE '+trim(pindex.wave_len)+' ('+trim(pindex.naxis1)+'x'+trim(pindex.naxis2)+')'
+  id='TRACE (IMG#'+trim2(img)+') '+trim2(pindex.wave_len)+' ('+trim2(pindex.naxis1)+'x'+trim2(pindex.naxis2)+')'
   self->mk_map,pindex,pdata,j,_extra=extra,filename=dfile,id=id,err=err,log_scale=log_scale,/no_copy
-  if is_string(err) then continue
+  if is_string(err) then begin
+   cerr=append_arr(cerr,err)
+   continue
+  endif
   j=j+1
  endfor
 endfor
 
+err=''
+if is_string(cerr) then begin
+ mprint,cerr
+ xtext,cerr,/dismiss,/center
+endif
+ 
 count=self->get(/count)
 if count eq 0 then begin
- err1='No maps created.'
- if is_string(err) then err=err1+' '+err else err=err1
- mprint,err,/info 
-endif
+ err='No maps created.'
+ mprint,err,_extra=extra
+endif else mprint,trim(count)+' maps created.'
 
 self->binaries,/reset
 
@@ -899,7 +910,7 @@ error=0
 catch,error
 if error ne 0 then begin
  err=err_state()
- mprint,err,/info
+ mprint,err,_extra=extra
  catch,/cancel
  message,/reset
  error=0
@@ -913,11 +924,13 @@ if keyword_set(thread) then begin
  if ~is_number(ops) then ops=64
 endif else ops=32
 
+;xtext,'Please be patient. Prepping file...',/just_reg,/center,wbase=tbase
+
 if self->need_thread() || keyword_set(thread) then begin
  thread,ops=ops,err=err,_extra=extra,output=concat_dir(get_temp_dir(),'bridge.txt'),switched_thread=switched
  if is_string(err) then begin
   err='Cannot decompress TRACE image on this system.'
-  mprint,err
+  mprint,err,_extra=extra
   return
  endif
  if ~self.thread || switched then begin
@@ -930,6 +943,7 @@ if self->need_thread() || keyword_set(thread) then begin
  thread,'read_trace',dfile,img,oindex,odata,_extra=extra,/quiet,/wait
 endif else read_trace,dfile,img,oindex,odata,/quiet,_extra=extra
 
+xkill,tbase
 return & end
 
 ;-----------------------------------------------------------------------------
@@ -942,7 +956,7 @@ error=0
 catch,error
 if error ne 0 then begin
  err=err_state()
- mprint,err,/info
+ mprint,err,_extra=extra
  catch,/cancel
  message,/reset
  return,''
@@ -997,7 +1011,7 @@ verbose=keyword_set(verbose)
 if is_url(file) then sock_fits,file,header=header,/nodata,err=err else $
  mrd_head,file,header,err=err
 if is_string(err) then begin
- mprint,'Could not read header - '+file,/info
+ mprint,'Could not read header - '+file,_extra=extra
  return,valid
 endif
 
@@ -1007,7 +1021,7 @@ chk3=where(stregex(header,'TRACE_PREP|tr_dark_sub|tr_flat_sub',/bool,/fold),coun
 valid=(count1 ne 0) || (count2 ne 0)
 
 if ~valid then begin
- mprint,'Not a valid TRACE file - '+file,/info
+ mprint,'Not a valid TRACE file - '+file,_extra=extra
  return,valid
 endif
 
@@ -1015,7 +1029,7 @@ if (count1 ne 0) then level=0
 if (count3 ne 0) then level=1
 if (count1 eq 0) then decompressed=1b
 
-if verbose && (level eq 1) then mprint,'TRACE image is already prepped.',/info
+if verbose && (level eq 1) then mprint,'TRACE image is already prepped.',_extra=extra
 
 return,valid
 end

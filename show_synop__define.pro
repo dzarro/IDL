@@ -819,6 +819,7 @@ end
 ;-- don't save object if file has to be re-read when prepped.
 
    chk=self->do_prep(rfile,read_again=read_again)
+   read_again=1b
    if ~read_again then !show_synop.fifo->set,rfile,data
 
   endfor
@@ -882,12 +883,15 @@ end
 ;-- if file had to be re-prepped, then we need to replace what
 ;   was last saved in PLOTMAN
 
- chk=self->do_prep(file_id,read_again=read_again)
- replace=0b & nodup=1b
- if read_again then begin
-  replace=1b & nodup=0b
- endif
+ ;chk=self->do_prep(file_id,read_again=read_again)
+ ;read_again=1b
+ ;replace=0b & nodup=1b
+ ;if read_again then begin
+ ; replace=1b & nodup=0
+ ;endif
  
+ nodup=0 & replace=1b
+
 ;-- use data object plotman method if available
 
  desc=file_basename(file_id)
@@ -1136,7 +1140,7 @@ ptr_free,self.ptr
 
 ;-- close any threads
 
-thread,/reset
+;thread,/reset
 xkill,'show_synop::setup'
 
 return & end
@@ -1183,7 +1187,6 @@ if obj_valid(sobj) && have_method(sobj,'add_file') then begin
   rfiles=sobj->add_file(rfiles)
   obj_destroy, sobj
 endif
-
 
 ofiles='' & count=0 & err=''
 down_prep=self->getprop(/down_prep)
@@ -1423,8 +1426,10 @@ case tvalue of
                                                                                              
  'apply':xkill,event.top                                                                     
       
- 'clear': self->list_cache,/clear
-                                                                                       
+ 'clear': begin
+           self->list_cache,/clear
+     ;      !show_synop.fifo->empty
+          end		   
  'cancel': begin                                                                             
    struct_assign,save_config,self,/nozero                                               
    xkill,event.top                                                                           

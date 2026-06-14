@@ -38,7 +38,7 @@
 ;               1-Sep-2018, Zarro (ADNET)
 ;               - added SOON
 ;               9-May-2026, Zarro (Retired)
-;               - added TRACE Level 1
+;               - added TRACE Level 1, and IRIS Level 2
 ;
 ; Contact     : dzarro@solar.stanford.edu
 ;-
@@ -55,7 +55,7 @@ names=[ 'Big Bear Solar Observatory (BBSO) | bbso',$
         'Hinode/EIS | eis',$
         'Hinode/SOT | sot',$
         'Hinode/XRT | xrt2',$
-        'IRIS | iris',$
+        'IRIS (SJI)| iris',$
         'Kanzelhohe Solar Observatory | kanz',$
         'Meudon Observatory | meudon',$
         'Messenger | messenger',$

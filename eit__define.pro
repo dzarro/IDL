@@ -36,7 +36,6 @@
 ; Contact     : dzarro@solar.stanford.edu
 ;-
 
-
 function eit::init,_ref_extra=extra
 
 if ~self->fits::init(_extra=extra) then return,0
